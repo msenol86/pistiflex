@@ -110,6 +110,8 @@ fn main() {
     let pl_4 = button_constructor("4".to_string()).center_of_parent();
 
     let tmp_b = pl_1.clone();
+
+    let mut cards_on_decs = Vec::new();
     for i in 0..my_game.deck.len() {
         let mut _deck = frame::Frame::default()
             .with_size(CARD_W, CARD_H)
@@ -122,6 +124,7 @@ fn main() {
             _deck.y(),
         );
         _deck.to_owned().deactivate();
+        cards_on_decs.push(_deck);
     }
 
     let hidden_board = frame::Frame::default()
@@ -275,18 +278,42 @@ fn main() {
                 ButtonAnimation::DC(dc) => {
                     println!("dc message received: {:?}", dc);
                     for (i, a_card) in dc.bottom_hand.iter().enumerate() {
+                        let mut a_card_frame = cards_on_decs.pop().unwrap();
+                        let endx = bottom_cards[i].x();
+                        let endy = bottom_cards[i].y();
+                        let time = 10.0;
+                        let time_len = time as usize;
+                        let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
+                        let series_x = st.0;
+                        let series_y = st.1;
+                        for i in 0..time_len {
+                            a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+                            app::sleep(0.01);
+                            a_card_frame.parent().unwrap().redraw();
+                        }
+                        a_card_frame.hide();
                         bottom_cards[i].show();
                         draw_card(&mut bottom_cards[i], *a_card);
                         bottom_cards[i].parent().unwrap().redraw();
-                        win_clone.redraw();
-                        println!("card {} drawed", a_card);
                     }
                     for (i, a_card) in dc.top_hand.iter().enumerate() {
+                        let mut a_card_frame = cards_on_decs.pop().unwrap();
+                        let endx = top_cards[i].x();
+                        let endy = top_cards[i].y();
+                        let time = 10.0;
+                        let time_len = time as usize;
+                        let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
+                        let series_x = st.0;
+                        let series_y = st.1;
+                        for i in 0..time_len {
+                            a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+                            app::sleep(0.01);
+                            a_card_frame.parent().unwrap().redraw();
+                        }
+                        a_card_frame.hide();
                         top_cards[i].show();
                         draw_card(&mut top_cards[i], *a_card);
                         top_cards[i].parent().unwrap().redraw();
-                        win_clone.redraw();
-                        println!("card {} drawed", a_card);
                     }
                 }
             }
