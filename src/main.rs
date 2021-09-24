@@ -49,9 +49,16 @@ pub struct CollectCards {
 }
 
 #[derive(Clone, Debug)]
+pub struct DistributeCards {
+    bottom_hand: [Card; 4],
+    top_hand: [Card; 4]
+}
+
+#[derive(Clone, Debug)]
 pub enum ButtonAnimation {
     MC(MoveCard),
     CC(CollectCards),
+    DC(DistributeCards),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -263,6 +270,24 @@ fn main() {
                             a_card_frame.parent().unwrap().redraw();
                         }
                     }
+                    cards_on_board = Vec::new();
+                },
+                ButtonAnimation::DC(dc) => {
+                    println!("dc message received: {:?}", dc);
+                    for (i, a_card) in dc.bottom_hand.iter().enumerate() {
+                        bottom_cards[i].show();
+                        draw_card(&mut bottom_cards[i], *a_card);
+                        bottom_cards[i].parent().unwrap().redraw();
+                        win_clone.redraw();
+                        println!("card {} drawed", a_card);
+                    }
+                    for (i, a_card) in dc.top_hand.iter().enumerate() {
+                        top_cards[i].show();
+                        draw_card(&mut top_cards[i], *a_card);
+                        top_cards[i].parent().unwrap().redraw();
+                        win_clone.redraw();
+                        println!("card {} drawed", a_card);
+                    }
                 }
             }
         }
@@ -332,7 +357,14 @@ fn main() {
                     }
                     if my_game.bottom_hand.len() < 1 && my_game.top_hand.len() < 1 {
                         if my_game.deck.len() > 7 {
-                            my_game.give_cards_to_players();
+                            let (bot_hand, top_hand) = my_game.give_cards_to_players();
+                            let bot_a = [bot_hand[0], bot_hand[1], bot_hand[2], bot_hand[3]];
+                            let top_a = [top_hand[0], top_hand[1], top_hand[2], top_hand[3]];
+                            bottom_cards_values = bot_hand;
+                            animations.push(ButtonAnimation::DC(DistributeCards {
+                                bottom_hand: bot_a,
+                                top_hand: top_a,
+                            }))
                         } else {
                             // last player get all remaining cards on board
                             my_game

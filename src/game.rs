@@ -1,5 +1,6 @@
 extern crate rand;
 
+use std::convert::TryInto;
 use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -106,13 +107,21 @@ impl Game {
         }
     }
 
-    pub fn give_cards_to_players(&mut self) {
+    /// return new (bottom hand, top hand)
+    pub fn give_cards_to_players(&mut self) -> (Vec<Card>, Vec<Card>){
+        let mut bottom_vec = Vec::new();
+        let mut top_vec = Vec::new();
         if self.deck.len() > 7 {
             for _i in 0..4 {
-                self.bottom_hand.push(self.deck.pop().unwrap());
-                self.top_hand.push(self.deck.pop().unwrap());
+                let bot_card = self.deck.pop().unwrap();
+                let top_card = self.deck.pop().unwrap();
+                self.bottom_hand.push(bot_card);
+                bottom_vec.push(bot_card);
+                top_vec.push(top_card);
+                self.top_hand.push(top_card);
             }
         }
+        (bottom_vec, top_vec)
     }
 
     pub fn put_cards_onto_board(&mut self) {
