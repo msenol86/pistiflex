@@ -1,11 +1,11 @@
-use fltk::{app::Sender, button::Button, enums::Color, frame::Frame, image, prelude::*};
+use fltk::{app::Sender, button::Button, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
 
 use crate::{ButtonAnimation, ChannelMessage, Row, game::{Card, Game, Suit}};
 
 pub fn button_constructor(a_label: String) -> Frame {
     let x = Frame::default().with_label(&a_label);
-    x.to_owned().set_frame(widget_themes::OS_DEFAULT_BUTTON_UP_BOX);
+    // x.to_owned().set_frame(widget_themes::OS_DEFAULT_BUTTON_UP_BOX);
     return x;
 }
 
@@ -51,3 +51,58 @@ pub fn draw_card(a_button: &mut Frame, card: Card) {
         };
 }
 
+pub fn draw_game(the_game: &Game, win: &mut DoubleWindow) {
+
+}
+
+
+// pub fn update_ui_on_button_press(
+//     ai_cards: &Vec<Button>,
+//     pl_cards: &Vec<Button>,
+//     board: &Button,
+//     the_game: &Game,
+//     out1: &Output,
+//     out2: &Output,
+// ) {
+//     let cards_len = the_game.player2_hand.len();
+//     for i in 0..4 {
+//         let ai_but = ai_cards.get(i).unwrap();
+//         let pl_but = pl_cards.get(i).unwrap();
+//         if i < cards_len {
+//             let a_string = format!("{}", the_game.player2_hand.get(i).unwrap());
+//             ai_but.to_owned().set_label(&a_string);
+//             let b_string = format!("{}", the_game.player1_hand.get(i).unwrap());
+//             pl_but.to_owned().set_label(&b_string);
+//             pl_but.to_owned().activate();
+//             pl_but.to_owned().clear_visible_focus();
+//         } else {
+//             ai_but.to_owned().set_label("");
+//             ai_but.to_owned().deactivate();
+//             pl_but.to_owned().set_label("");
+//             pl_but.to_owned().deactivate();
+//             pl_but.to_owned().clear_visible_focus();
+//         }
+//     }
+//     if the_game.board.len() > 0 {
+//         let c_string = format!("{}", the_game.board.last().unwrap());
+//         board.to_owned().set_label(&c_string);
+//     } else {
+//         board.to_owned().set_label("");
+//     }
+//     let o_string1 = format!(
+//         "{} Pist({}) PT({})",
+//         the_game.player1_won_cards.len(),
+//         the_game.player1_pisti_count,
+//         the_game.player1_point,
+//     );
+//     let o_string2 = format!(
+//         "{} Pist({}) PT({})",
+//         the_game.player2_won_cards.len(),
+//         the_game.player2_pisti_count,
+//         the_game.player2_point,
+//     );
+//     out1.to_owned().set_value(&o_string1);
+//     out2.to_owned().set_value(&o_string2);
+//     println!("player1_won_cards: {:#?}", the_game.player1_won_cards);
+//     println!("player2_won_cards: {:#?}", the_game.player2_won_cards);
+// }

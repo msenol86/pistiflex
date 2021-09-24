@@ -16,7 +16,7 @@ use fltk::{
     window::Window,
 };
 use fltk_theme::{ThemeType, WidgetTheme};
-use widget::{button_constructor};
+use widget::button_constructor;
 
 use game::Game;
 
@@ -47,8 +47,15 @@ pub struct ButtonAnimation {
     card_index: usize,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct EventMessage {
+    pub the_player: game::Player,
+    pub card: Card,
+}
+
 #[derive(Clone, Debug)]
 pub enum ChannelMessage {
+    EM(EventMessage),
     UI(u32),
     BR(ButtonAnimation),
 }
@@ -102,11 +109,25 @@ fn main() {
         );
         _deck.to_owned().deactivate();
     }
-    let mut board = frame::Frame::default()
+
+    let hidden_board = frame::Frame::default()
         .with_label("B")
         .with_size(CARD_W, CARD_H)
         .center_of_parent();
-    draw_card(&mut board, my_game.board[my_game.board.len() - 1]);
+    let boardx = hidden_board.x();
+    let boardy = hidden_board.y();
+    hidden_board.to_owned().hide();
+
+    let mut cards_on_board = Vec::new();
+    for (i, a_card) in my_game.board.iter().enumerate() {
+        let mut board = frame::Frame::default()
+            .with_size(CARD_W, CARD_H)
+            .center_of_parent();
+
+        board.set_pos(board.x() + i as i32, board.y());
+        draw_card(&mut board, *a_card);
+        cards_on_board.push(board);
+    }
 
     let start = button::Button::default()
         .with_label("Start")
@@ -127,26 +148,23 @@ fn main() {
         let mut ai_but = top_cards.get_mut(my_index).unwrap();
         ai_but.set_size(CARD_W, CARD_H);
         ai_but.set_pos((my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2), 20);
-        draw_card(&mut ai_but, my_game.player2_hand[my_index]);
+        draw_card(&mut ai_but, my_game.top_hand[my_index]);
 
         let mut pl_but = bottom_cards.get_mut(my_index).unwrap();
         pl_but.set_size(CARD_W, CARD_H);
-        pl_but.set_pos((my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2), WIN_HEIGHT - 20 - CARD_H);
-        draw_card(&mut pl_but, my_game.player1_hand[my_index]);
+        pl_but.set_pos(
+            (my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2),
+            WIN_HEIGHT - 20 - CARD_H,
+        );
+        draw_card(&mut pl_but, my_game.bottom_hand[my_index]);
     }
 
-    let board_card = my_game.board[3];
-    board
-        .to_owned()
-        .set_label(format!("{}{}", rank_to_str(board_card.rank), board_card.suit).as_str());
-    // set_button_color(&board, board_card.suit);
-
-    let my_game_arc = Arc::new(my_game);
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {
-            let endx = board.x();
-            let endy = board.y();
-            let t_game = my_game_arc.clone();
+            let endx = boardx;
+            let endy = boardy;
+            let t_hand =my_game.top_hand.clone();
+            let b_hand =my_game.bottom_hand.clone();
             let t_s = s.clone();
             a_but.to_owned().set_callback(move |b| {
                 b.to_owned().emit(
@@ -157,9 +175,9 @@ fn main() {
                         endx: endx,
                         endy: endy,
                         card: if j == 0 {
-                            *t_game.player2_hand.get(i).unwrap()
+                            t_hand[i]
                         } else {
-                            *t_game.player1_hand.get(i).unwrap()
+                            b_hand[i]
                         },
                         row: if j == 0 { Row::Top } else { Row::Bottom },
                         card_index: i,
@@ -207,6 +225,16 @@ fn main() {
                 app::sleep(0.01);
                 new_but.parent().unwrap().redraw();
             }
+
+            let player = match ba.row {
+                Row::Bottom => game::Player::Player1,
+                Row::Top => game::Player::Player2,
+            };
+
+            s.send(ChannelMessage::EM(EventMessage {
+                the_player: player,
+                card: ba.card,
+            }));
         }
     });
 
@@ -225,7 +253,91 @@ fn main() {
                         }
                     }
                 }
+                ChannelMessage::EM(msg) => {
+                    println!("eventmessage: {:#?}", msg);
+                    let bot_i =my_game.get_index_of_card(msg.card, game::Player::Player1);
+                    let a_card = my_game.bottom_hand.remove(bot_i);
+                    println!("you played: {}", a_card);
+                    let stat = my_game.play_card(a_card);
+                    let mut moved = my_game.move_cards_if_win(stat, game::Player::Player1);
+                    if moved {
+
+                    } else {
+                        let ai_card_index = my_game.pick_card_for_ai();
+                        let a_card = my_game.top_hand.remove(ai_card_index);
+                        println!("ai played: {}", a_card);
+                        let stat = my_game.play_card(a_card);
+                        my_game.move_cards_if_win(stat, game::Player::Player2);
+                        if my_game.bottom_hand.len() < 1 && my_game.top_hand.len() < 1 {
+                            if my_game.deck.len() > 7 {
+                                my_game.give_cards_to_players();
+                            } else {
+                                // last player get all remaining cards on board
+                                my_game.move_cards_if_win(
+                                    game::WinStatus::Win,
+                                    my_game.get_last_player(),
+                                );
+                            }
+                        }
+                    }
+                    // update_ui_on_button_press(
+                    //     &ai_cards,
+                    //     &player_cards,
+                    //     &board,
+                    //     &my_game,
+                    //     &out1,
+                    //     &out2,
+                    // );
+                }
             }
         }
     }
+    // while a.wait() {
+    //     if let Some(c_msg) = r.recv() {
+    //         match c_msg {
+    //             ChannelMessage::EM(msg) => {
+    //                 println!("{:#?}", msg);
+    //                 let a_card = my_game.player1_hand.remove(msg.card_index as usize);
+    //                 println!("you played: {}", a_card);
+    //                 let stat = my_game.play_card(a_card);
+    //                 my_game.move_cards_if_win(stat, Player1);
+    //                 let ai_card_index = my_game.pick_card_for_ai();
+    //                 let a_card = my_game.player2_hand.remove(ai_card_index);
+    //                 println!("ai played: {}", a_card);
+    //                 let stat = my_game.play_card(a_card);
+    //                 my_game.move_cards_if_win(stat, Player2);
+    //                 if my_game.player1_hand.len() < 1 && my_game.player2_hand.len() < 1 {
+    //                     if my_game.deck.len() > 7 {
+    //                         my_game.give_cards_to_players();
+    //                     } else {
+    //                         // last player get all remaining cards on board
+    //                         my_game.move_cards_if_win(Win, my_game.get_last_player());
+    //                     }
+    //                 }
+    //                 update_ui_on_button_press(
+    //                     &ai_cards,
+    //                     &player_cards,
+    //                     &board,
+    //                     &my_game,
+    //                     &out1,
+    //                     &out2,
+    //                 );
+    //             }
+    //             ChannelMessage::NM(a_msg) => {
+    //                 process_network_msg(a_msg, my_local_ip, tmp_ip.to_owned(), &mut wind);
+    //             }
+    //             ChannelMessage::Dialog(an_ip4) => {
+    //                 thread::spawn(move || {
+    //                     let r = send_invite_request(my_local_ip.unwrap(), an_ip4, BRD_PORT);
+    //                     match r {
+    //                         Ok(_) => {}
+    //                         Err(e) => {
+    //                             println!("error invite: {}", e)
+    //                         }
+    //                     }
+    //                 });
+    //             }
+    //         }
+    //     }
+    // }
 }

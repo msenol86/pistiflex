@@ -19,7 +19,7 @@ const R_J: u8 = 11;
 const R_Q: u8 = 12;
 const R_K: u8 = 13;
 
-#[derive(Debug, EnumIter, Copy, Clone)]
+#[derive(Debug, EnumIter, Copy, Clone, PartialEq)]
 pub enum Suit {
     Spade,
     Heart,
@@ -46,7 +46,7 @@ impl fmt::Display for Suit {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Card {
     pub rank: u8,
     pub suit: Suit,
@@ -57,8 +57,8 @@ pub struct Card {
 pub struct Game {
     pub board: PlayCards,
     pub deck: PlayCards,
-    pub player1_hand: PlayCards,
-    pub player2_hand: PlayCards,
+    pub bottom_hand: PlayCards,
+    pub top_hand: PlayCards,
     pub player1_won_cards: PlayCards,
     pub player2_won_cards: PlayCards,
     pub player1_pisti_count: u8,
@@ -74,8 +74,8 @@ impl Game {
         Game {
             board: vec![],
             deck: vec![],
-            player1_hand: vec![],
-            player2_hand: vec![],
+            bottom_hand: vec![],
+            top_hand: vec![],
             player1_won_cards: vec![],
             player2_won_cards: vec![],
             player1_pisti_count: 0,
@@ -109,8 +109,8 @@ impl Game {
     pub fn give_cards_to_players(&mut self) {
         if self.deck.len() > 7 {
             for _i in 0..4 {
-                self.player1_hand.push(self.deck.pop().unwrap());
-                self.player2_hand.push(self.deck.pop().unwrap());
+                self.bottom_hand.push(self.deck.pop().unwrap());
+                self.top_hand.push(self.deck.pop().unwrap());
             }
         }
     }
@@ -125,7 +125,7 @@ impl Game {
 
     pub fn pick_card_for_ai(&mut self) -> usize {
         let ai_cards = self.get_ai_player_hand().unwrap();
-        let mut tmp_i = get_random_index(&self.player2_hand);
+        let mut tmp_i = get_random_index(&self.top_hand);
 
         return if self.board.len() > 0 {
             let card_on_board = self.board.last().unwrap();
@@ -180,21 +180,25 @@ impl Game {
         }
     }
 
-    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player) {
+    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player) -> bool{
+        let mut moved = false;
         match stat {
             WinStatus::Pisti | WinStatus::Win => match player {
                 Player::Player1 => {
                     self.player1_won_cards.append(&mut self.board);
                     self.create_pisti(stat, player);
+                    moved = true;
                 }
                 Player::Player2 => {
                     self.player2_won_cards.append(&mut self.board);
                     self.create_pisti(stat, player);
+                    moved = true;
                 }
             },
             WinStatus::Pass => {}
         }
         self.calculate_points();
+        return moved
     }
 
     pub fn get_last_player(&self) -> Player {
@@ -202,6 +206,16 @@ impl Game {
             Player::Player1 => Player::Player2,
             Player::Player2 => Player::Player1,
         }
+    }
+
+    pub fn get_index_of_card(&self, a_card: Card, a_player: Player) -> usize {
+        let mut ri = 0;
+        for (i, t_card) in self.get_player_cards(a_player).iter().enumerate() {
+            if a_card == *t_card {
+                ri = i;
+            }
+        }
+        return ri;
     }
 
     pub fn is_reshuffle_required(&self) -> bool {
@@ -213,8 +227,8 @@ impl Game {
 
     pub fn get_player_cards(&self, a_player: Player) -> &PlayCards {
         match a_player {
-            Player::Player1 => &self.player1_hand,
-            Player::Player2 => &self.player2_hand,
+            Player::Player1 => &self.bottom_hand,
+            Player::Player2 => &self.top_hand,
         }
     }
 
