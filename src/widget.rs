@@ -66,6 +66,18 @@ pub fn  draw_animations(win: &mut DoubleWindow, animations: Vec<ButtonAnimation>
     // remove temp frames
 }
 
+pub fn deactivate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
+    for a_card in bottom_card_frames {
+        a_card.deactivate();
+    }
+}
+
+
+pub fn activate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
+    for a_card in bottom_card_frames {
+        a_card.activate();
+    }
+}
 
 // pub fn update_ui_on_button_press(
 //     ai_cards: &Vec<Button>,

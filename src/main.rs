@@ -22,7 +22,7 @@ use game::Game;
 
 use std::sync::mpsc;
 
-use crate::{game::{Card, Suit, WinStatus, rank_to_str}, widget::{draw_card, draw_game}};
+use crate::{game::{Card, Suit, WinStatus, rank_to_str}, widget::{activate_all_bottom_cards, deactivate_all_bottom_cards, draw_card, draw_game}};
 
 #[cfg(test)]
 mod test;
@@ -246,11 +246,13 @@ fn main() {
                     let series_x = st.0;
                     let series_y = st.1;
                     cards_on_board.push(new_but);
+                    deactivate_all_bottom_cards(&mut bottom_cards);
                     for i in 0..time_len {
                         cards_on_board.last().unwrap().to_owned().set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                         app::sleep(0.01);
                         cards_on_board.last().unwrap().to_owned().parent().unwrap().redraw();
                     }
+                    activate_all_bottom_cards(&mut bottom_cards);
                 }
                 ButtonAnimation::CC(cc) => {
                     let (_,endx,endy) = match cc.player {
@@ -267,11 +269,13 @@ fn main() {
                         let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
                         let series_x = st.0;
                         let series_y = st.1;
+                        deactivate_all_bottom_cards(&mut bottom_cards);
                         for i in 0..time_len {
                             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                             app::sleep(0.01);
                             a_card_frame.parent().unwrap().redraw();
                         }
+                        activate_all_bottom_cards(&mut bottom_cards);
                     }
                     cards_on_board = Vec::new();
                 },
@@ -286,11 +290,13 @@ fn main() {
                         let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
                         let series_x = st.0;
                         let series_y = st.1;
+                        deactivate_all_bottom_cards(&mut bottom_cards);
                         for i in 0..time_len {
                             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                             app::sleep(0.01);
                             a_card_frame.parent().unwrap().redraw();
                         }
+                        activate_all_bottom_cards(&mut bottom_cards);
                         a_card_frame.hide();
                         bottom_cards[i].show();
                         draw_card(&mut bottom_cards[i], *a_card);
@@ -305,11 +311,13 @@ fn main() {
                         let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
                         let series_x = st.0;
                         let series_y = st.1;
+                        deactivate_all_bottom_cards(&mut bottom_cards);
                         for i in 0..time_len {
                             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                             app::sleep(0.01);
                             a_card_frame.parent().unwrap().redraw();
                         }
+                        activate_all_bottom_cards(&mut bottom_cards);
                         a_card_frame.hide();
                         top_cards[i].show();
                         draw_card(&mut top_cards[i], *a_card);
