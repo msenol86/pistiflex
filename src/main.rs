@@ -1,16 +1,22 @@
 mod animation;
 mod calc;
 mod game;
-mod network;
 mod widget;
 
-use std::{cmp::{max, min}, sync::Arc, thread, time::Duration};
+use std::{sync::Arc, thread};
 
 use calc::series_xy;
-use fltk::{app, button::{self, Button}, enums::{self, CallbackTrigger}, frame::{self, Frame}, group::{self, Pack}, prelude::*, window::Window};
-use fltk_flex::{Flex, FlexType};
-use fltk_theme::{widget_themes, ThemeType, WidgetTheme};
-use widget::{button_constructor, card_into_filename, set_button_color};
+use fltk::{
+    app,
+    button::{self, Button},
+    enums::{self, CallbackTrigger},
+    frame::{self, Frame},
+    group::{self, Pack},
+    prelude::*,
+    window::Window,
+};
+use fltk_theme::{ThemeType, WidgetTheme};
+use widget::{button_constructor};
 
 use game::Game;
 
@@ -18,7 +24,7 @@ use std::sync::mpsc;
 
 use crate::{
     game::{rank_to_str, Card, Suit},
-    widget::{draw_card},
+    widget::draw_card,
 };
 
 #[cfg(test)]
@@ -61,56 +67,34 @@ fn main() {
     my_game.give_cards_to_players();
     let a = app::App::default();
     let (s, r) = app::channel::<ChannelMessage>();
-    // let array_of_s = Arc::new([&s.clone(), &s.clone(), &s.clone(), &s.clone()]);
     let (t_s, t_r) = mpsc::channel::<ButtonAnimation>();
-    let (network_s, network_r) = mpsc::channel::<network::NetworkMessage>();
     let theme = WidgetTheme::new(ThemeType::Metro);
     theme.apply();
     const WIN_WIDTH: i32 = 600;
     const WIN_HEIGHT: i32 = 600;
+    const CARD_H: i32 = 315 / 2;
+    const CARD_W: i32 = 225 / 2;
+    const CARD_MARGIN: i32 = 80;
 
     let mut win = Window::default()
-        .with_size(600, 600)
+        .with_size(WIN_WIDTH, WIN_HEIGHT)
         .with_label("My Window");
-    let mut flex = Flex::default()
-        .with_size(WIN_WIDTH - 10, WIN_HEIGHT - 10)
-        .center_of_parent()
-        .column();
+    let ai_1 = button_constructor("1".to_string()).center_of_parent();
+    let ai_2 = button_constructor("2".to_string()).center_of_parent();
+    let ai_3 = button_constructor("3".to_string()).center_of_parent();
+    let ai_4 = button_constructor("4".to_string()).center_of_parent();
+    let pl_1 = button_constructor("1".to_string()).center_of_parent();
+    let pl_2 = button_constructor("2".to_string()).center_of_parent();
+    let pl_3 = button_constructor("3".to_string()).center_of_parent();
+    let pl_4 = button_constructor("4".to_string()).center_of_parent();
 
-    let mut upper_flex = Flex::default().row();
-    let mut upper2_flex = Flex::default().with_size(200, 100).center_of_parent().row();
-    upper2_flex.set_margin(10);
-    let ai_1 = button_constructor("1".to_string());
-    let ai_2 = button_constructor("2".to_string());
-    let ai_3 = button_constructor("3".to_string());
-    let ai_4 = button_constructor("4".to_string());
-    upper2_flex.end();
-    upper_flex.end();
-
-    let mut pack = Pack::default();
-    flex.set_size(&mut pack, 200);
-    pack.set_spacing(10);
-    pack.end();
-
-    let mut bottom_flex = Flex::default().row();
-    let mut bottom2_flex = Flex::default().with_size(200, 100).center_of_parent().row();
-    bottom2_flex.set_margin(10);
-    let pl_1 = button_constructor("1".to_string());
-    let pl_2 = button_constructor("2".to_string());
-    let pl_3 = button_constructor("3".to_string());
-    let pl_4 = button_constructor("4".to_string());
-
-
-    bottom2_flex.end();
-    bottom_flex.end();
-
-    // flex.debug(true);
-    flex.end();
     let tmp_b = pl_1.clone();
     for i in 0..my_game.deck.len() {
         let mut _deck = frame::Frame::default()
-            .with_size(225 / 2, 315 / 2)
+            .with_size(CARD_W, CARD_H)
             .center_of_parent();
+
+        _deck.set_pos(_deck.x() - 200, _deck.y());
         draw_card(&mut _deck, my_game.deck[i]);
         _deck.to_owned().set_pos(
             _deck.x() - tmp_b.width() - (tmp_b.width() / 2) + (i as i32 * 1),
@@ -118,10 +102,11 @@ fn main() {
         );
         _deck.to_owned().deactivate();
     }
-    let board = button::Button::default()
+    let mut board = frame::Frame::default()
         .with_label("B")
-        .with_size(tmp_b.width(), tmp_b.height())
+        .with_size(CARD_W, CARD_H)
         .center_of_parent();
+    draw_card(&mut board, my_game.board[my_game.board.len() - 1]);
 
     let start = button::Button::default()
         .with_label("Start")
@@ -135,20 +120,19 @@ fn main() {
     let but_w = tmp_b.w();
     let but_h = tmp_b.h();
 
-    let top_cards = vec![ai_1, ai_2, ai_3, ai_4];
-    let bottom_cards = vec![pl_1, pl_2, pl_3, pl_4];
+    let mut top_cards = vec![ai_1, ai_2, ai_3, ai_4];
+    let mut bottom_cards = vec![pl_1, pl_2, pl_3, pl_4];
 
     for my_index in 0..4 {
-        let ai_but = top_cards.get(my_index).unwrap();
-        ai_but.to_owned().deactivate();
-        let a_string = format!("{}", my_game.player2_hand.get(my_index).unwrap());
-        ai_but.to_owned().set_label(&a_string);
-        set_button_color(&ai_but, my_game.player2_hand.get(my_index).unwrap().suit);
+        let mut ai_but = top_cards.get_mut(my_index).unwrap();
+        ai_but.set_size(CARD_W, CARD_H);
+        ai_but.set_pos((my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2), 20);
+        draw_card(&mut ai_but, my_game.player2_hand[my_index]);
 
-        let pl_but = bottom_cards.get(my_index).unwrap();
-        let b_string = format!("{}", my_game.player1_hand.get(my_index).unwrap());
-        pl_but.to_owned().set_label(&b_string);
-        set_button_color(&pl_but, my_game.player1_hand.get(my_index).unwrap().suit);
+        let mut pl_but = bottom_cards.get_mut(my_index).unwrap();
+        pl_but.set_size(CARD_W, CARD_H);
+        pl_but.set_pos((my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2), WIN_HEIGHT - 20 - CARD_H);
+        draw_card(&mut pl_but, my_game.player1_hand[my_index]);
     }
 
     let board_card = my_game.board[3];
@@ -157,17 +141,12 @@ fn main() {
         .set_label(format!("{}{}", rank_to_str(board_card.rank), board_card.suit).as_str());
     // set_button_color(&board, board_card.suit);
 
-
-    let my_box = Arc::new(my_game);
-    // let my_s_box = Arc::new(array_of_s);
+    let my_game_arc = Arc::new(my_game);
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {
-            // a_but.to_owned().set_callback(|x| {
-            //     println!("callback");
-            // });
             let endx = board.x();
             let endy = board.y();
-            let t_game = my_box.clone();
+            let t_game = my_game_arc.clone();
             let t_s = s.clone();
             a_but.to_owned().set_callback(move |b| {
                 b.to_owned().emit(
@@ -185,13 +164,14 @@ fn main() {
                         row: if j == 0 { Row::Top } else { Row::Bottom },
                         card_index: i,
                     }),
-                );   
+                );
             });
-            a_but.to_owned().handle(|b, ev| {
-                match ev {
-                    enums::Event::Push => {b.do_callback() ;true}
-                    _ => {false}
+            a_but.to_owned().handle(|b, ev| match ev {
+                enums::Event::Push => {
+                    b.do_callback();
+                    true
                 }
+                _ => false,
             })
         }
     }
@@ -205,7 +185,7 @@ fn main() {
                     .with_pos(ba.startx, ba.starty)
                     .with_size(but_w, but_h);
             new_but.set_size(tmp_b.width(), tmp_b.height());
-            set_button_color(&new_but, ba.card.suit);
+            draw_card(&mut new_but, ba.card);
             win.insert(&new_but, t_index);
             match ba.row {
                 Row::Top => match top_cards.get(ba.card_index) {
@@ -222,22 +202,10 @@ fn main() {
             let st = series_xy(ba.startx, ba.endx, ba.starty, ba.endy, time);
             let series_x = st.0;
             let series_y = st.1;
-            println!("sx: {:?}", series_x);
-            println!("sy: {:?}", series_y);
             for i in 0..time_len {
                 new_but.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                 app::sleep(0.01);
                 new_but.parent().unwrap().redraw();
-            }
-        }
-    });
-
-    let _networking = thread::spawn(move || {
-        if let Ok(nm) = network_r.recv() {
-            match nm {
-                network::NetworkMessage::StartBroadcast(port) => {
-                    network::broadcast_port_and_username("msenol".to_string(), port.to_string())
-                }
             }
         }
     });
@@ -249,9 +217,7 @@ fn main() {
                     println!("recevied code: {}", ui_code);
                 }
                 ChannelMessage::BR(bm) => {
-                    println!("app channel receive msg: {:?}", bm);
                     let tmp_sender = t_s.clone();
-                    println!("thread still alive: {:?}", _animator.thread());
                     match tmp_sender.send(bm) {
                         Ok(_) => {}
                         Err(e) => {
