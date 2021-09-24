@@ -179,23 +179,6 @@ fn main() {
             let t_hand = my_game.top_hand.clone();
             let b_hand = my_game.bottom_hand.clone();
             let fltk_sender = s.clone();
-            // let t_s = s.clone();
-            // if j == 1 {
-            //     a_but.to_owned().set_callback(move |b| {
-            //         b.to_owned().emit(
-            //             t_s.to_owned(),
-            //             ChannelMessage::BR(ButtonAnimation::MC(MoveCard {
-            //                 startx: b.x(),
-            //                 starty: b.y(),
-            //                 endx: endx,
-            //                 endy: endy,
-            //                 card: if j == 0 { t_hand[i] } else { b_hand[i] },
-            //                 row: if j == 0 { Row::Top } else { Row::Bottom },
-            //                 card_index: i,
-            //             })),
-            //         );
-            //     });
-            // }
             if j == 1 {
                 a_but.to_owned().set_callback(move |b| {
                     b.to_owned().emit(
@@ -252,13 +235,35 @@ fn main() {
                     let st = series_xy(ba.startx, ba.endx, ba.starty, ba.endy, time);
                     let series_x = st.0;
                     let series_y = st.1;
+                    cards_on_board.push(new_but);
                     for i in 0..time_len {
-                        new_but.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+                        cards_on_board.last().unwrap().to_owned().set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
                         app::sleep(0.01);
-                        new_but.parent().unwrap().redraw();
+                        cards_on_board.last().unwrap().to_owned().parent().unwrap().redraw();
                     }
                 }
-                ButtonAnimation::CC(cc) => {}
+                ButtonAnimation::CC(cc) => {
+                    let (_,endx,endy) = match cc.player {
+                        game::Player::Player1 => {
+                            (Row::Bottom, boardx, WIN_HEIGHT)
+                        },
+                        game::Player::Player2 => {
+                            (Row::Top, boardx, 0 - CARD_H)
+                        },
+                    };
+                    for mut a_card_frame in cards_on_board.to_owned() {
+                        let time = 10.0;
+                        let time_len = time as usize;
+                        let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
+                        let series_x = st.0;
+                        let series_y = st.1;
+                        for i in 0..time_len {
+                            a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+                            app::sleep(0.01);
+                            a_card_frame.parent().unwrap().redraw();
+                        }
+                    }
+                }
             }
         }
     });

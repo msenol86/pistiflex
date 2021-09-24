@@ -21,6 +21,7 @@ pub fn set_button_color(but: &Frame, suit: Suit) {
     
 }
 
+
 pub fn card_into_filename(card: Card) -> String {
     let first_letter = match card.rank {
         11 => {"J".to_string()},
