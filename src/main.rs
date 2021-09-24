@@ -24,7 +24,7 @@ use std::sync::mpsc;
 
 use crate::{
     game::{rank_to_str, Card, Suit},
-    widget::draw_card,
+    widget::{draw_card, draw_game},
 };
 
 #[cfg(test)]
@@ -163,27 +163,25 @@ fn main() {
         for (i, a_but) in a_vec.iter().enumerate() {
             let endx = boardx;
             let endy = boardy;
-            let t_hand =my_game.top_hand.clone();
-            let b_hand =my_game.bottom_hand.clone();
+            let t_hand = my_game.top_hand.clone();
+            let b_hand = my_game.bottom_hand.clone();
             let t_s = s.clone();
-            a_but.to_owned().set_callback(move |b| {
-                b.to_owned().emit(
-                    t_s.to_owned(),
-                    ChannelMessage::BR(ButtonAnimation {
-                        startx: b.x(),
-                        starty: b.y(),
-                        endx: endx,
-                        endy: endy,
-                        card: if j == 0 {
-                            t_hand[i]
-                        } else {
-                            b_hand[i]
-                        },
-                        row: if j == 0 { Row::Top } else { Row::Bottom },
-                        card_index: i,
-                    }),
-                );
-            });
+            if j == 1 {
+                a_but.to_owned().set_callback(move |b| {
+                    b.to_owned().emit(
+                        t_s.to_owned(),
+                        ChannelMessage::BR(ButtonAnimation {
+                            startx: b.x(),
+                            starty: b.y(),
+                            endx: endx,
+                            endy: endy,
+                            card: if j == 0 { t_hand[i] } else { b_hand[i] },
+                            row: if j == 0 { Row::Top } else { Row::Bottom },
+                            card_index: i,
+                        }),
+                    );
+                });
+            }
             a_but.to_owned().handle(|b, ev| match ev {
                 enums::Event::Push => {
                     b.do_callback();
@@ -194,17 +192,18 @@ fn main() {
         }
     }
 
+    let mut win_clone = win.clone();
     let _animator = thread::spawn(move || loop {
         if let Ok(ba) = t_r.recv() {
             println!("animation mesg: {:?}", ba);
-            let t_index = win.children();
+            let t_index = win_clone.children();
             let mut new_but =
                 button_constructor(format!("{}{}", rank_to_str(ba.card.rank), ba.card.suit))
                     .with_pos(ba.startx, ba.starty)
                     .with_size(but_w, but_h);
             new_but.set_size(tmp_b.width(), tmp_b.height());
             draw_card(&mut new_but, ba.card);
-            win.insert(&new_but, t_index);
+            win_clone.insert(&new_but, t_index);
             match ba.row {
                 Row::Top => match top_cards.get(ba.card_index) {
                     Some(a_b) => a_b.to_owned().hide(),
@@ -255,13 +254,13 @@ fn main() {
                 }
                 ChannelMessage::EM(msg) => {
                     println!("eventmessage: {:#?}", msg);
-                    let bot_i =my_game.get_index_of_card(msg.card, game::Player::Player1);
+                    let bot_i = my_game.get_index_of_card(msg.card, game::Player::Player1);
                     let a_card = my_game.bottom_hand.remove(bot_i);
                     println!("you played: {}", a_card);
                     let stat = my_game.play_card(a_card);
                     let mut moved = my_game.move_cards_if_win(stat, game::Player::Player1);
                     if moved {
-
+                        draw_game(&my_game, &mut win);
                     } else {
                         let ai_card_index = my_game.pick_card_for_ai();
                         let a_card = my_game.top_hand.remove(ai_card_index);
