@@ -203,7 +203,7 @@ impl Game {
             },
             WinStatus::Pass => {}
         }
-        self.calculate_points();
+        // self.calculate_points();
     }
 
     pub fn get_last_player(&self) -> Player {
