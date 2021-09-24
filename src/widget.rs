@@ -1,5 +1,7 @@
-use fltk::{app::Sender, button::Button, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
+use fltk::{button::Button, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
+
+use std::sync::mpsc::Sender;
 
 use crate::{ButtonAnimation, ChannelMessage, Row, game::{Card, Game, Suit}};
 
@@ -51,8 +53,16 @@ pub fn draw_card(a_button: &mut Frame, card: Card) {
         };
 }
 
-pub fn draw_game(the_game: &Game, win: &mut DoubleWindow) {
+pub fn draw_game(the_game: &Game, win: &mut DoubleWindow, animations: Vec<ButtonAnimation>, sender: Sender<ButtonAnimation>) {
+    draw_animations(win, animations, sender);
+    // redraw_game_state();
+}
 
+pub fn  draw_animations(win: &mut DoubleWindow, animations: Vec<ButtonAnimation>, sender: Sender<ButtonAnimation>) {
+    for an_animation in animations {
+        sender.send(an_animation);
+    }
+    // remove temp frames
 }
 
 

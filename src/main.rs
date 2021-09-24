@@ -22,10 +22,7 @@ use game::Game;
 
 use std::sync::mpsc;
 
-use crate::{
-    game::{rank_to_str, Card, Suit},
-    widget::{draw_card, draw_game},
-};
+use crate::{game::{Card, Suit, WinStatus, rank_to_str}, widget::{draw_card, draw_game}};
 
 #[cfg(test)]
 mod test;
@@ -37,7 +34,7 @@ pub enum Row {
 }
 
 #[derive(Clone, Debug)]
-pub struct ButtonAnimation {
+pub struct MoveCard {
     startx: i32,
     starty: i32,
     endx: i32,
@@ -46,11 +43,21 @@ pub struct ButtonAnimation {
     row: Row,
     card_index: usize,
 }
+#[derive(Clone, Debug)]
+pub struct CollectCards {
+    player: game::Player,
+}
+
+#[derive(Clone, Debug)]
+pub enum ButtonAnimation {
+    MC(MoveCard),
+    CC(CollectCards),
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct EventMessage {
     pub the_player: game::Player,
-    pub card: Card,
+    pub card_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -141,14 +148,19 @@ fn main() {
     let but_w = tmp_b.w();
     let but_h = tmp_b.h();
 
+    let top_cards_immut = vec![ai_1.clone(), ai_2.clone(), ai_3.clone(), ai_4.clone()];
     let mut top_cards = vec![ai_1, ai_2, ai_3, ai_4];
+    let mut bottom_cards_values: Vec<Card> = vec![];
+    let bottom_cards_immut = vec![pl_1.clone(), pl_2.clone(), pl_3.clone(), pl_4.clone()];
     let mut bottom_cards = vec![pl_1, pl_2, pl_3, pl_4];
+    
 
     for my_index in 0..4 {
         let mut ai_but = top_cards.get_mut(my_index).unwrap();
         ai_but.set_size(CARD_W, CARD_H);
         ai_but.set_pos((my_index as i32 + 1) * CARD_MARGIN + (CARD_MARGIN / 2), 20);
         draw_card(&mut ai_but, my_game.top_hand[my_index]);
+        
 
         let mut pl_but = bottom_cards.get_mut(my_index).unwrap();
         pl_but.set_size(CARD_W, CARD_H);
@@ -157,6 +169,7 @@ fn main() {
             WIN_HEIGHT - 20 - CARD_H,
         );
         draw_card(&mut pl_but, my_game.bottom_hand[my_index]);
+        bottom_cards_values.push(my_game.bottom_hand[my_index]);
     }
 
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
@@ -165,23 +178,36 @@ fn main() {
             let endy = boardy;
             let t_hand = my_game.top_hand.clone();
             let b_hand = my_game.bottom_hand.clone();
-            let t_s = s.clone();
+            let fltk_sender = s.clone();
+            // let t_s = s.clone();
+            // if j == 1 {
+            //     a_but.to_owned().set_callback(move |b| {
+            //         b.to_owned().emit(
+            //             t_s.to_owned(),
+            //             ChannelMessage::BR(ButtonAnimation::MC(MoveCard {
+            //                 startx: b.x(),
+            //                 starty: b.y(),
+            //                 endx: endx,
+            //                 endy: endy,
+            //                 card: if j == 0 { t_hand[i] } else { b_hand[i] },
+            //                 row: if j == 0 { Row::Top } else { Row::Bottom },
+            //                 card_index: i,
+            //             })),
+            //         );
+            //     });
+            // }
             if j == 1 {
                 a_but.to_owned().set_callback(move |b| {
                     b.to_owned().emit(
-                        t_s.to_owned(),
-                        ChannelMessage::BR(ButtonAnimation {
-                            startx: b.x(),
-                            starty: b.y(),
-                            endx: endx,
-                            endy: endy,
-                            card: if j == 0 { t_hand[i] } else { b_hand[i] },
-                            row: if j == 0 { Row::Top } else { Row::Bottom },
+                        fltk_sender.to_owned(),
+                        ChannelMessage::EM(EventMessage {
+                            the_player: game::Player::Player1,
                             card_index: i,
-                        }),
+                        })
                     );
                 });
             }
+
             a_but.to_owned().handle(|b, ev| match ev {
                 enums::Event::Push => {
                     b.do_callback();
@@ -194,46 +220,46 @@ fn main() {
 
     let mut win_clone = win.clone();
     let _animator = thread::spawn(move || loop {
-        if let Ok(ba) = t_r.recv() {
-            println!("animation mesg: {:?}", ba);
-            let t_index = win_clone.children();
-            let mut new_but =
-                button_constructor(format!("{}{}", rank_to_str(ba.card.rank), ba.card.suit))
+        if let Ok(msg) = t_r.recv() {
+            match msg {
+                ButtonAnimation::MC(ba) => {
+                    println!("animation mesg: {:?}", ba);
+                    let t_index = win_clone.children();
+                    let mut new_but = button_constructor(format!(
+                        "{}{}",
+                        rank_to_str(ba.card.rank),
+                        ba.card.suit
+                    ))
                     .with_pos(ba.startx, ba.starty)
                     .with_size(but_w, but_h);
-            new_but.set_size(tmp_b.width(), tmp_b.height());
-            draw_card(&mut new_but, ba.card);
-            win_clone.insert(&new_but, t_index);
-            match ba.row {
-                Row::Top => match top_cards.get(ba.card_index) {
-                    Some(a_b) => a_b.to_owned().hide(),
-                    None => {}
-                },
-                Row::Bottom => match bottom_cards.get(ba.card_index) {
-                    Some(a_b) => a_b.to_owned().hide(),
-                    None => {}
-                },
+                    new_but.set_size(tmp_b.width(), tmp_b.height());
+                    draw_card(&mut new_but, ba.card);
+                    win_clone.insert(&new_but, t_index);
+                    let avaiable_top_cards: Vec<&Frame> =
+                        top_cards.iter().filter(|t_f| t_f.visible()).collect();
+                    match ba.row {
+                        Row::Top => match avaiable_top_cards.get(ba.card_index) {
+                            Some(a_b) => {let xxxx = *a_b; xxxx.to_owned().hide()},
+                            None => {}
+                        },
+                        Row::Bottom => match bottom_cards.get(ba.card_index) {
+                            Some(a_b) => a_b.to_owned().hide(),
+                            None => {}
+                        },
+                    }
+                    let time = 50.0;
+                    let time_len = time as usize;
+                    let st = series_xy(ba.startx, ba.endx, ba.starty, ba.endy, time);
+                    let series_x = st.0;
+                    let series_y = st.1;
+                    for i in 0..time_len {
+                        new_but.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+                        app::sleep(0.01);
+                        new_but.parent().unwrap().redraw();
+                    }
+                }
+                ButtonAnimation::CC(cc) => {}
             }
-            let time = 50.0;
-            let time_len = time as usize;
-            let st = series_xy(ba.startx, ba.endx, ba.starty, ba.endy, time);
-            let series_x = st.0;
-            let series_y = st.1;
-            for i in 0..time_len {
-                new_but.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                app::sleep(0.01);
-                new_but.parent().unwrap().redraw();
-            }
-
-            let player = match ba.row {
-                Row::Bottom => game::Player::Player1,
-                Row::Top => game::Player::Player2,
-            };
-
-            s.send(ChannelMessage::EM(EventMessage {
-                the_player: player,
-                card: ba.card,
-            }));
         }
     });
 
@@ -254,89 +280,67 @@ fn main() {
                 }
                 ChannelMessage::EM(msg) => {
                     println!("eventmessage: {:#?}", msg);
-                    let bot_i = my_game.get_index_of_card(msg.card, game::Player::Player1);
+                    let human_player_card = bottom_cards_values[msg.card_index];
+                    let mut animations = Vec::new();
+                    let bot_i = my_game.get_index_of_card(human_player_card, game::Player::Player1);
                     let a_card = my_game.bottom_hand.remove(bot_i);
                     println!("you played: {}", a_card);
+                    animations.push(ButtonAnimation::MC(MoveCard {
+                        startx: bottom_cards_immut[msg.card_index].x(),
+                        starty: bottom_cards_immut[msg.card_index].y(),
+                        endx: boardx,
+                        endy: boardy,
+                        card: a_card,
+                        row: Row::Bottom,
+                        card_index: msg.card_index,
+                    }));
                     let stat = my_game.play_card(a_card);
-                    let mut moved = my_game.move_cards_if_win(stat, game::Player::Player1);
-                    if moved {
-                        draw_game(&my_game, &mut win);
-                    } else {
-                        let ai_card_index = my_game.pick_card_for_ai();
-                        let a_card = my_game.top_hand.remove(ai_card_index);
-                        println!("ai played: {}", a_card);
-                        let stat = my_game.play_card(a_card);
-                        my_game.move_cards_if_win(stat, game::Player::Player2);
-                        if my_game.bottom_hand.len() < 1 && my_game.top_hand.len() < 1 {
-                            if my_game.deck.len() > 7 {
-                                my_game.give_cards_to_players();
-                            } else {
-                                // last player get all remaining cards on board
-                                my_game.move_cards_if_win(
-                                    game::WinStatus::Win,
-                                    my_game.get_last_player(),
-                                );
-                            }
+                    my_game.move_cards_if_win(stat, game::Player::Player1);
+                    match stat {
+                        WinStatus::Pisti | WinStatus::Win => {animations.push(ButtonAnimation::CC(CollectCards {
+                            player: game::Player::Player1,
+                        }))},
+                        _ => {}
+                    }
+                    let ai_card_index = my_game.pick_card_for_ai();
+                    let a_card = my_game.top_hand.remove(ai_card_index);
+                    println!("ai played: {}", a_card);
+                    let avaiable_cards: Vec<&Frame> =
+                        top_cards_immut.iter().filter(|t_f| t_f.visible()).collect();
+                    println!("avaiable_cards {:?}", avaiable_cards.len());
+                    animations.push(ButtonAnimation::MC(MoveCard {
+                        startx: avaiable_cards[ai_card_index].x(),
+                        starty: avaiable_cards[ai_card_index].y(),
+                        endx: boardx,
+                        endy: boardy,
+                        card: a_card,
+                        row: Row::Top,
+                        card_index: ai_card_index,
+                    }));
+                    let stat = my_game.play_card(a_card);
+                    my_game.move_cards_if_win(stat, game::Player::Player2);
+                    match stat {
+                        WinStatus::Pisti | WinStatus::Win => {animations.push(ButtonAnimation::CC(CollectCards {
+                            player: game::Player::Player2,
+                        }))},
+                        _ => {}
+                    }
+                    if my_game.bottom_hand.len() < 1 && my_game.top_hand.len() < 1 {
+                        if my_game.deck.len() > 7 {
+                            my_game.give_cards_to_players();
+                        } else {
+                            // last player get all remaining cards on board
+                            my_game
+                                .move_cards_if_win(game::WinStatus::Win, my_game.get_last_player());
+                            animations.push(ButtonAnimation::CC(CollectCards {
+                                player: game::Player::Player2,
+                            }))
                         }
                     }
-                    // update_ui_on_button_press(
-                    //     &ai_cards,
-                    //     &player_cards,
-                    //     &board,
-                    //     &my_game,
-                    //     &out1,
-                    //     &out2,
-                    // );
+
+                    draw_game(&my_game, &mut win, animations, t_s.clone());
                 }
             }
         }
     }
-    // while a.wait() {
-    //     if let Some(c_msg) = r.recv() {
-    //         match c_msg {
-    //             ChannelMessage::EM(msg) => {
-    //                 println!("{:#?}", msg);
-    //                 let a_card = my_game.player1_hand.remove(msg.card_index as usize);
-    //                 println!("you played: {}", a_card);
-    //                 let stat = my_game.play_card(a_card);
-    //                 my_game.move_cards_if_win(stat, Player1);
-    //                 let ai_card_index = my_game.pick_card_for_ai();
-    //                 let a_card = my_game.player2_hand.remove(ai_card_index);
-    //                 println!("ai played: {}", a_card);
-    //                 let stat = my_game.play_card(a_card);
-    //                 my_game.move_cards_if_win(stat, Player2);
-    //                 if my_game.player1_hand.len() < 1 && my_game.player2_hand.len() < 1 {
-    //                     if my_game.deck.len() > 7 {
-    //                         my_game.give_cards_to_players();
-    //                     } else {
-    //                         // last player get all remaining cards on board
-    //                         my_game.move_cards_if_win(Win, my_game.get_last_player());
-    //                     }
-    //                 }
-    //                 update_ui_on_button_press(
-    //                     &ai_cards,
-    //                     &player_cards,
-    //                     &board,
-    //                     &my_game,
-    //                     &out1,
-    //                     &out2,
-    //                 );
-    //             }
-    //             ChannelMessage::NM(a_msg) => {
-    //                 process_network_msg(a_msg, my_local_ip, tmp_ip.to_owned(), &mut wind);
-    //             }
-    //             ChannelMessage::Dialog(an_ip4) => {
-    //                 thread::spawn(move || {
-    //                     let r = send_invite_request(my_local_ip.unwrap(), an_ip4, BRD_PORT);
-    //                     match r {
-    //                         Ok(_) => {}
-    //                         Err(e) => {
-    //                             println!("error invite: {}", e)
-    //                         }
-    //                     }
-    //                 });
-    //             }
-    //         }
-    //     }
-    // }
 }

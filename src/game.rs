@@ -180,25 +180,21 @@ impl Game {
         }
     }
 
-    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player) -> bool{
-        let mut moved = false;
+    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player){
         match stat {
             WinStatus::Pisti | WinStatus::Win => match player {
                 Player::Player1 => {
                     self.player1_won_cards.append(&mut self.board);
                     self.create_pisti(stat, player);
-                    moved = true;
                 }
                 Player::Player2 => {
                     self.player2_won_cards.append(&mut self.board);
                     self.create_pisti(stat, player);
-                    moved = true;
                 }
             },
             WinStatus::Pass => {}
         }
         self.calculate_points();
-        return moved
     }
 
     pub fn get_last_player(&self) -> Player {
