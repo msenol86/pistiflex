@@ -6,21 +6,13 @@ mod widget;
 use std::{sync::Arc, thread};
 
 use calc::series_xy;
-use fltk::{
-    app,
-    button::{self, Button},
-    dialog,
-    enums::{self, CallbackTrigger},
-    frame::{self, Frame},
-    group::{self, Pack},
-    prelude::*,
-    window::Window,
-};
+use fltk::{app::{self, awake}, button::{self, Button}, dialog, enums::{self, CallbackTrigger}, frame::{self, Frame}, group::{self, Pack}, prelude::*, window::Window};
 use fltk_theme::{ThemeType, WidgetTheme};
 use widget::button_constructor;
 
 use game::Game;
-
+use std::io::stdout;
+use std::io::Write;
 use std::sync::mpsc;
 
 use crate::{
@@ -101,10 +93,11 @@ fn main() {
     const CARD_H: i32 = 315 / 2;
     const CARD_W: i32 = 225 / 2;
     const CARD_MARGIN: i32 = 80;
+    const ANIM_SPEED: f64 = 0.01;
 
     let mut win = Window::default()
         .with_size(WIN_WIDTH, WIN_HEIGHT)
-        .with_label("My Window");
+        .with_label("Pist");
     let ai_1 = button_constructor("1".to_string()).center_of_parent();
     let ai_2 = button_constructor("2".to_string()).center_of_parent();
     let ai_3 = button_constructor("3".to_string()).center_of_parent();
@@ -217,7 +210,7 @@ fn main() {
         if let Ok(msg) = t_r.recv() {
             match msg {
                 ButtonAnimation::MC(ba) => {
-                    println!("animation mesg: {:?}", ba);
+                    // println!("animation mesg: {:?}", ba);
                     let t_index = win_clone.children();
                     let mut new_but = button_constructor(format!(
                         "{}{}",
@@ -257,7 +250,8 @@ fn main() {
                             .unwrap()
                             .to_owned()
                             .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                        app::sleep(0.01);
+                        app::sleep(ANIM_SPEED);
+                        app::awake();
                         cards_on_board
                             .last()
                             .unwrap()
@@ -285,7 +279,8 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(0.01);
+                            app::sleep(ANIM_SPEED);
+                            app::awake();
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -293,7 +288,7 @@ fn main() {
                     cards_on_board = Vec::new();
                 }
                 ButtonAnimation::DC(dc) => {
-                    println!("dc message received: {:?}", dc);
+                    // println!("dc message received: {:?}", dc);
                     for (i, a_card) in dc.bottom_hand.iter().enumerate() {
                         let mut a_card_frame = cards_on_decs.pop().unwrap();
                         let endx = bottom_cards[i].x();
@@ -307,7 +302,8 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(0.01);
+                            app::sleep(ANIM_SPEED);
+                            app::awake();
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -329,7 +325,8 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(0.01);
+                            app::sleep(ANIM_SPEED);
+                            app::awake();
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -340,7 +337,10 @@ fn main() {
                     }
                 }
                 ButtonAnimation::GameOver(s) => {
-                    dialog::message(hidden_board.x(), hidden_board.y(), s.as_str());
+                    let t_index = win_clone.children();
+                    let b = frame::Frame::default().with_size(400, 50).with_label(s.as_str());
+                    win_clone.insert(&b,t_index);
+                    b.center_of_parent();
                 }
             }
         }
@@ -350,7 +350,7 @@ fn main() {
         if let Some(c_msg) = r.recv() {
             match c_msg {
                 ChannelMessage::UI(ui_code) => {
-                    println!("recevied code: {}", ui_code);
+                    // println!("recevied code: {}", ui_code);
                 }
                 ChannelMessage::BR(bm) => {
                     let tmp_sender = t_s.clone();
@@ -362,12 +362,13 @@ fn main() {
                     }
                 }
                 ChannelMessage::EM(msg) => {
-                    println!("eventmessage: {:#?}", msg);
+                    // println!("eventmessage: {:#?}", msg);
                     let human_player_card = bottom_cards_values[msg.card_index];
                     let mut animations = Vec::new();
                     let bot_i = my_game.get_index_of_card(human_player_card, game::Player::Player1);
                     let a_card = my_game.bottom_hand.remove(bot_i);
-                    println!("you played: {}", a_card);
+                    // println!("you played: {}", a_card);
+                    // animations.push(ButtonAnimation::GameOver("Test".to_string()));
                     animations.push(ButtonAnimation::MC(MoveCard {
                         startx: bottom_cards_immut[msg.card_index].x(),
                         starty: bottom_cards_immut[msg.card_index].y(),
@@ -389,10 +390,10 @@ fn main() {
                     }
                     let ai_card_index = my_game.pick_card_for_ai();
                     let a_card = my_game.top_hand.remove(ai_card_index);
-                    println!("ai played: {}", a_card);
+                    // println!("ai played: {}", a_card);
                     let avaiable_cards: Vec<&Frame> =
                         top_cards_immut.iter().filter(|t_f| t_f.visible()).collect();
-                    println!("avaiable_cards {:?}", avaiable_cards.len());
+                    // println!("avaiable_cards {:?}", avaiable_cards.len());
                     animations.push(ButtonAnimation::MC(MoveCard {
                         startx: avaiable_cards[ai_card_index].x(),
                         starty: avaiable_cards[ai_card_index].y(),
