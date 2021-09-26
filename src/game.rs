@@ -1,11 +1,11 @@
 extern crate rand;
 
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::convert::TryInto;
 use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use rand::thread_rng;
-use rand::seq::SliceRandom;
 
 type PlayCards = Vec<Card>;
 
@@ -53,6 +53,17 @@ pub struct Card {
     pub suit: Suit,
 }
 
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", rank_to_str(self.rank), self.suit)
+    }
+}
+
+impl fmt::Debug for Card {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, " {}{} ", rank_to_str(self.rank), self.suit)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -108,7 +119,7 @@ impl Game {
     }
 
     /// return new (bottom hand, top hand)
-    pub fn give_cards_to_players(&mut self) -> (Vec<Card>, Vec<Card>){
+    pub fn give_cards_to_players(&mut self) -> (Vec<Card>, Vec<Card>) {
         let mut bottom_vec = Vec::new();
         let mut top_vec = Vec::new();
         if self.deck.len() > 7 {
@@ -189,7 +200,7 @@ impl Game {
         }
     }
 
-    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player){
+    pub fn move_cards_if_win(&mut self, stat: WinStatus, player: Player) {
         match stat {
             WinStatus::Pisti | WinStatus::Win => match player {
                 Player::Player1 => {
@@ -304,17 +315,7 @@ pub fn get_random_index(a_vec: &PlayCards) -> usize {
     (rand::random::<f32>() * a_vec.len() as f32).floor() as usize
 }
 
-impl fmt::Display for Card {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", rank_to_str(self.rank), self.suit)
-    }
-}
 
-impl fmt::Debug for Card {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, " {}{} ", rank_to_str(self.rank), self.suit)
-    }
-}
 
 pub fn rank_to_str(a_rank: u8) -> String {
     return match a_rank {

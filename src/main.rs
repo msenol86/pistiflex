@@ -3,21 +3,32 @@ mod calc;
 mod game;
 mod widget;
 
-use std::{sync::Arc, thread};
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use calc::series_xy;
-use fltk::{app::{self, awake}, button::{self, Button}, dialog, enums::{self, CallbackTrigger}, frame::{self, Frame}, group::{self, Pack}, prelude::*, window::Window};
+use fltk::{
+    app::{self},
+    enums::{self},
+    frame::{self, Frame},
+    prelude::*,
+    window::{DoubleWindow, Window},
+};
 use fltk_theme::{ThemeType, WidgetTheme};
 use widget::button_constructor;
 
 use game::Game;
-use std::io::stdout;
-use std::io::Write;
 use std::sync::mpsc;
 
 use crate::{
-    game::{rank_to_str, Card, Suit, WinStatus},
-    widget::{activate_all_bottom_cards, deactivate_all_bottom_cards, draw_card, draw_game},
+    game::{Card, WinStatus},
+    widget::{
+        activate_all_bottom_cards, deactivate_all_bottom_cards, draw_card, draw_game,
+        sleep_and_awake,
+    },
 };
 
 #[cfg(test)]
@@ -71,6 +82,171 @@ pub enum ChannelMessage {
     BR(ButtonAnimation),
 }
 
+pub fn get_avaiable_cards_on_ui(card_frames: &Vec<Frame>) -> Vec<Frame> {
+    return card_frames
+        .iter()
+        .filter(|&t_f| t_f.visible())
+        .map(|t_f| t_f.to_owned())
+        .collect();
+}
+
+pub fn get_player_cards_on_ui<'a>(
+    row: Row,
+    top_cards: &'a Vec<Frame>,
+    bottom_cards: &'a Vec<Frame>,
+    card_index: usize,
+) -> &'a Frame {
+    match row {
+        Row::Top => &top_cards[card_index],
+        Row::Bottom => &bottom_cards[card_index],
+    }
+}
+
+pub fn move_card_animation(
+    win_clone: &mut DoubleWindow,
+    ba: MoveCard,
+    top_cards: &Vec<Frame>,
+    bottom_cards: &Vec<Frame>,
+    cards_on_board: &mut Vec<Frame>,
+    anim_speed: f64,
+    but_w: i32,
+    but_h: i32,
+    reference_card_frame: &Frame,
+    cards_on_board_lastx: &Mutex<i32>,
+    cards_on_board_lasty: &Mutex<i32>,
+    boardx: i32,
+    boardy: i32,
+) {
+    // println!("animation mesg: {:?}", ba);
+    let t_index = win_clone.children();
+    let mut new_but = button_constructor(format!("{}", ba.card))
+        .with_pos(ba.startx, ba.starty)
+        .with_size(but_w, but_h);
+    new_but.set_size(reference_card_frame.width(), reference_card_frame.height());
+    draw_card(&mut new_but, ba.card, false);
+    win_clone.insert(&new_but, t_index);
+    let avaiable_top_cards: Vec<Frame> = get_avaiable_cards_on_ui(top_cards);
+    let card_to_hide =
+        get_player_cards_on_ui(ba.row, &avaiable_top_cards, bottom_cards, ba.card_index);
+    card_to_hide.to_owned().hide();
+    let (x, y) = get_pos_for_new_card_on_board(cards_on_board, boardx, boardy);
+    let time = 50.0;
+    let time_len = time as usize;
+    let st = series_xy(ba.startx, x, ba.starty, y, time);
+    let series_x = st.0;
+    let series_y = st.1;
+    cards_on_board.push(new_but);
+    let mut bottom_cards_clone = bottom_cards.clone();
+    deactivate_all_bottom_cards(&mut bottom_cards_clone);
+    for i in 0..time_len {
+        cards_on_board
+            .last()
+            .unwrap()
+            .to_owned()
+            .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
+        sleep_and_awake(anim_speed);
+        cards_on_board
+            .last()
+            .unwrap()
+            .to_owned()
+            .parent()
+            .unwrap()
+            .redraw();
+    }
+    let mut lastx = cards_on_board_lastx.lock().unwrap();
+    let mut lasty = cards_on_board_lasty.lock().unwrap();
+    *lastx = x;
+    *lasty = y;
+    cards_on_board
+        .last()
+        .unwrap()
+        .to_owned()
+        .set_pos(*lastx, *lasty);
+    cards_on_board
+        .last()
+        .unwrap()
+        .to_owned()
+        .parent()
+        .unwrap()
+        .redraw();
+    activate_all_bottom_cards(&mut bottom_cards_clone);
+}
+
+pub fn generate_card_frames_on_deck_on_ui(
+    game_deck: &Vec<Card>,
+    card_w: i32,
+    card_h: i32,
+    reference_card_frame: &Frame,
+) -> Vec<Frame> {
+    let mut tmp_deck = Vec::new();
+    for i in 0..game_deck.len() {
+        let mut _deck = frame::Frame::default()
+            .with_size(card_w, card_h)
+            .center_of_parent();
+
+        _deck.set_pos(_deck.x() - 200, _deck.y());
+        draw_card(&mut _deck, game_deck[i], true);
+        _deck.to_owned().set_pos(
+            _deck.x() - reference_card_frame.width() - (reference_card_frame.width() / 2)
+                + (i as i32 * 1),
+            _deck.y(),
+        );
+        _deck.to_owned().deactivate();
+        tmp_deck.push(_deck);
+    }
+    return tmp_deck;
+}
+
+pub fn generate_card_frames_on_board_ui(
+    game_board: &Vec<Card>,
+    card_w: i32,
+    card_h: i32,
+) -> (Vec<Frame>, usize, i32, i32) {
+    let mut tmp_board = Vec::new();
+    let mut lastx = 0;
+    let mut lasty = 0;
+    let mut last_len = 0;
+    for (i, a_card) in game_board.iter().enumerate() {
+        let mut board = frame::Frame::default()
+            .with_size(card_w, card_h)
+            .center_of_parent();
+
+        board.set_pos(board.x() + (i as i32) * 10, board.y());
+        if i < 3 {
+            draw_card(&mut board, *a_card, true);
+        } else {
+            draw_card(&mut board, *a_card, false);
+        }
+        lastx = board.x();
+        lasty = board.y();
+        tmp_board.push(board);
+        last_len = tmp_board.len();
+    }
+    return (tmp_board, last_len, lastx, lasty);
+}
+
+pub fn generate_hidden_board_card_frame(card_w: i32, card_h: i32) -> (i32, i32, Frame) {
+    let hidden_board = frame::Frame::default()
+        .with_label("B")
+        .with_size(card_w, card_h)
+        .center_of_parent();
+    let boardx = hidden_board.x();
+    let boardy = hidden_board.y();
+    hidden_board.to_owned().hide();
+    return (boardx, boardy, hidden_board);
+}
+
+pub fn get_pos_for_new_card_on_board(
+    cards_on_board: &Vec<Frame>,
+    boardx: i32,
+    boardy: i32,
+) -> (i32, i32) {
+    match cards_on_board.last() {
+        Some(a_f) => (a_f.to_owned().x() + 5, a_f.to_owned().y()),
+        None => (boardx, boardy),
+    }
+}
+
 fn main() {
     let mut my_game = Game::new();
     my_game.create_deck();
@@ -107,52 +283,23 @@ fn main() {
     let pl_3 = button_constructor("3".to_string()).center_of_parent();
     let pl_4 = button_constructor("4".to_string()).center_of_parent();
 
-    let tmp_b = pl_1.clone();
+    let reference_card_frame = pl_1.clone();
 
-    let mut cards_on_decs = Vec::new();
-    for i in 0..my_game.deck.len() {
-        let mut _deck = frame::Frame::default()
-            .with_size(CARD_W, CARD_H)
-            .center_of_parent();
+    let mut cards_on_decs =
+        generate_card_frames_on_deck_on_ui(&my_game.deck, CARD_W, CARD_H, &reference_card_frame);
 
-        _deck.set_pos(_deck.x() - 200, _deck.y());
-        draw_card(&mut _deck, my_game.deck[i], true);
-        _deck.to_owned().set_pos(
-            _deck.x() - tmp_b.width() - (tmp_b.width() / 2) + (i as i32 * 1),
-            _deck.y(),
-        );
-        _deck.to_owned().deactivate();
-        cards_on_decs.push(_deck);
-    }
+    let (boardx, boardy, _hidden_board) = generate_hidden_board_card_frame(CARD_W, CARD_H);
 
-    let hidden_board = frame::Frame::default()
-        .with_label("B")
-        .with_size(CARD_W, CARD_H)
-        .center_of_parent();
-    let boardx = hidden_board.x();
-    let boardy = hidden_board.y();
-    hidden_board.to_owned().hide();
-
-    let mut cards_on_board = Vec::new();
-    for (i, a_card) in my_game.board.iter().enumerate() {
-        let mut board = frame::Frame::default()
-            .with_size(CARD_W, CARD_H)
-            .center_of_parent();
-
-        board.set_pos(board.x() + i as i32, board.y());
-        if i < 3 {
-            draw_card(&mut board, *a_card, true);
-        } else {
-            draw_card(&mut board, *a_card, false);
-        }
-        cards_on_board.push(board);
-    }
+    let (mut cards_on_board, _, lastx, lasty) =
+        generate_card_frames_on_board_ui(&my_game.board, CARD_W, CARD_H);
+    let cards_on_board_lastx = Mutex::new(lastx);
+    let cards_on_board_lasty = Mutex::new(lasty);
 
     win.end();
     win.show();
 
-    let but_w = tmp_b.w();
-    let but_h = tmp_b.h();
+    let but_w = reference_card_frame.w();
+    let but_h = reference_card_frame.h();
 
     let top_cards_immut = vec![ai_1.clone(), ai_2.clone(), ai_3.clone(), ai_4.clone()];
     let mut top_cards = vec![ai_1, ai_2, ai_3, ai_4];
@@ -178,10 +325,6 @@ fn main() {
 
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {
-            let endx = boardx;
-            let endy = boardy;
-            let t_hand = my_game.top_hand.clone();
-            let b_hand = my_game.bottom_hand.clone();
             let fltk_sender = s.clone();
             if j == 1 {
                 a_but.to_owned().set_callback(move |b| {
@@ -209,65 +352,27 @@ fn main() {
     let _animator = thread::spawn(move || loop {
         if let Ok(msg) = t_r.recv() {
             match msg {
-                ButtonAnimation::MC(ba) => {
-                    // println!("animation mesg: {:?}", ba);
-                    let t_index = win_clone.children();
-                    let mut new_but = button_constructor(format!(
-                        "{}{}",
-                        rank_to_str(ba.card.rank),
-                        ba.card.suit
-                    ))
-                    .with_pos(ba.startx, ba.starty)
-                    .with_size(but_w, but_h);
-                    new_but.set_size(tmp_b.width(), tmp_b.height());
-                    draw_card(&mut new_but, ba.card, false);
-                    win_clone.insert(&new_but, t_index);
-                    let avaiable_top_cards: Vec<&Frame> =
-                        top_cards.iter().filter(|t_f| t_f.visible()).collect();
-                    match ba.row {
-                        Row::Top => match avaiable_top_cards.get(ba.card_index) {
-                            Some(a_b) => {
-                                let xxxx = *a_b;
-                                xxxx.to_owned().hide()
-                            }
-                            None => {}
-                        },
-                        Row::Bottom => match bottom_cards.get(ba.card_index) {
-                            Some(a_b) => a_b.to_owned().hide(),
-                            None => {}
-                        },
-                    }
-                    let time = 50.0;
-                    let time_len = time as usize;
-                    let st = series_xy(ba.startx, ba.endx, ba.starty, ba.endy, time);
-                    let series_x = st.0;
-                    let series_y = st.1;
-                    cards_on_board.push(new_but);
-                    deactivate_all_bottom_cards(&mut bottom_cards);
-                    for i in 0..time_len {
-                        cards_on_board
-                            .last()
-                            .unwrap()
-                            .to_owned()
-                            .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                        app::sleep(ANIM_SPEED);
-                        app::awake();
-                        cards_on_board
-                            .last()
-                            .unwrap()
-                            .to_owned()
-                            .parent()
-                            .unwrap()
-                            .redraw();
-                    }
-                    activate_all_bottom_cards(&mut bottom_cards);
-                }
+                ButtonAnimation::MC(ba) => move_card_animation(
+                    &mut win_clone,
+                    ba,
+                    &top_cards,
+                    &bottom_cards,
+                    &mut cards_on_board,
+                    ANIM_SPEED,
+                    but_w,
+                    but_h,
+                    &reference_card_frame,
+                    &cards_on_board_lastx,
+                    &cards_on_board_lasty,
+                    boardx,
+                    boardy,
+                ),
                 ButtonAnimation::CC(cc) => {
                     let (_, endx, endy) = match cc.player {
                         game::Player::Player1 => (Row::Bottom, boardx, WIN_HEIGHT),
                         game::Player::Player2 => (Row::Top, boardx, 0 - CARD_H),
                     };
-                    
+
                     for (i, _) in cards_on_board.iter().enumerate().rev() {
                         let mut a_card_frame = cards_on_board[i].to_owned();
                         let time = 10.0;
@@ -279,8 +384,7 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(ANIM_SPEED);
-                            app::awake();
+                            sleep_and_awake(ANIM_SPEED);
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -302,8 +406,7 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(ANIM_SPEED);
-                            app::awake();
+                            sleep_and_awake(ANIM_SPEED);
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -325,8 +428,7 @@ fn main() {
                         for i in 0..time_len {
                             a_card_frame
                                 .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                            app::sleep(ANIM_SPEED);
-                            app::awake();
+                            sleep_and_awake(ANIM_SPEED);
                             a_card_frame.parent().unwrap().redraw();
                         }
                         activate_all_bottom_cards(&mut bottom_cards);
@@ -338,8 +440,10 @@ fn main() {
                 }
                 ButtonAnimation::GameOver(s) => {
                     let t_index = win_clone.children();
-                    let b = frame::Frame::default().with_size(400, 50).with_label(s.as_str());
-                    win_clone.insert(&b,t_index);
+                    let b = frame::Frame::default()
+                        .with_size(400, 50)
+                        .with_label(s.as_str());
+                    win_clone.insert(&b, t_index);
                     b.center_of_parent();
                 }
             }
@@ -349,7 +453,7 @@ fn main() {
     while a.wait() {
         if let Some(c_msg) = r.recv() {
             match c_msg {
-                ChannelMessage::UI(ui_code) => {
+                ChannelMessage::UI(_ui_code) => {
                     // println!("recevied code: {}", ui_code);
                 }
                 ChannelMessage::BR(bm) => {
@@ -369,11 +473,12 @@ fn main() {
                     let a_card = my_game.bottom_hand.remove(bot_i);
                     // println!("you played: {}", a_card);
                     // animations.push(ButtonAnimation::GameOver("Test".to_string()));
+                    let (endx, endy) = (boardx, boardy);
                     animations.push(ButtonAnimation::MC(MoveCard {
                         startx: bottom_cards_immut[msg.card_index].x(),
                         starty: bottom_cards_immut[msg.card_index].y(),
-                        endx: boardx,
-                        endy: boardy,
+                        endx,
+                        endy,
                         card: a_card,
                         row: Row::Bottom,
                         card_index: msg.card_index,
@@ -394,11 +499,12 @@ fn main() {
                     let avaiable_cards: Vec<&Frame> =
                         top_cards_immut.iter().filter(|t_f| t_f.visible()).collect();
                     // println!("avaiable_cards {:?}", avaiable_cards.len());
+                    let (endx, endy) = (boardx, boardy);
                     animations.push(ButtonAnimation::MC(MoveCard {
                         startx: avaiable_cards[ai_card_index].x(),
                         starty: avaiable_cards[ai_card_index].y(),
-                        endx: boardx,
-                        endy: boardy,
+                        endx,
+                        endy,
                         card: a_card,
                         row: Row::Top,
                         card_index: ai_card_index,
