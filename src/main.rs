@@ -31,11 +31,11 @@ use crate::{
 #[cfg(test)]
 mod test;
 
-const WIN_WIDTH: i32 = 600;
-const WIN_HEIGHT: i32 = 600;
-const CARD_H: i32 = 315 / 2;
-const CARD_W: i32 = 225 / 2;
-const CARD_MARGIN: i32 = 80;
+const WIN_WIDTH: i32 = 800;
+const WIN_HEIGHT: i32 = 800;
+const CARD_H: i32 = 204;
+const CARD_W: i32 = 144;
+const CARD_MARGIN: i32 = 110;
 const ANIM_SPEED: f64 = 0.01;
 
 #[derive(Clone, Debug)]
