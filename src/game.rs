@@ -309,6 +309,19 @@ impl Game {
             }
         }
     }
+
+    pub fn start_game_and_give_cards_to_players(&mut self) {
+        self.create_deck();
+        self.shuffle_deck();
+        self.put_cards_onto_board();
+        while self.is_reshuffle_required() {
+            println!("J is the top card on board. Reshuffling");
+            self.create_deck();
+            self.shuffle_deck();
+            self.put_cards_onto_board();
+        }
+        self.give_cards_to_players();
+    }
 }
 
 pub fn get_random_index(a_vec: &PlayCards) -> usize {
