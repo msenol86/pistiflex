@@ -103,3 +103,9 @@ pub fn sleep_and_awake(anim_speed: f64) {
     app::sleep(anim_speed);
     app::awake();
 }
+
+pub fn insert_new_item_into_window<'a>(win: &'a mut DoubleWindow, a_frame: &Frame) -> &'a mut DoubleWindow {
+    let t_index = win.children();
+    win.insert(a_frame, t_index);
+    return win;   
+}
