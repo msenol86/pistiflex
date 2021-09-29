@@ -2,7 +2,6 @@ extern crate rand;
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::convert::TryInto;
 use std::fmt;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;

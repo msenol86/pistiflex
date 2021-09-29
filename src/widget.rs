@@ -1,11 +1,11 @@
-use fltk::{enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow, app};
+use fltk::{app, enums::{Color}, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
 
 use std::sync::mpsc::Sender;
 
 use crate::{
-    game::{Card, Game, Suit},
-    ButtonAnimation, 
+    game::{Card, Suit},
+    ui::ThreadMessage, 
 };
 
 pub fn button_constructor(a_label: String) -> Frame {
@@ -14,7 +14,7 @@ pub fn button_constructor(a_label: String) -> Frame {
     return x;
 }
 
-pub fn set_button_color(but: &Frame, suit: Suit) {
+pub fn _set_button_color(but: &Frame, suit: Suit) {
     but.to_owned()
         .set_frame(widget_themes::OS_DEFAULT_BUTTON_UP_BOX);
     but.to_owned().set_label_size(24);
@@ -67,24 +67,23 @@ pub fn draw_card(a_button: &mut Frame, card: Card, hidden: bool) {
 }
 
 pub fn draw_game(
-    the_game: &Game,
-    win: &mut DoubleWindow,
-    animations: Vec<ButtonAnimation>,
-    sender: Sender<ButtonAnimation>,
+    animations: Vec<ThreadMessage>,
+    sender: Sender<ThreadMessage>,
 ) {
-    draw_animations(win, animations, sender);
-    // redraw_game_state();
+    draw_animations(animations, sender);
 }
 
 pub fn draw_animations(
-    win: &mut DoubleWindow,
-    animations: Vec<ButtonAnimation>,
-    sender: Sender<ButtonAnimation>,
+    animations: Vec<ThreadMessage>,
+    sender: Sender<ThreadMessage>,
 ) {
     for an_animation in animations {
-        sender.send(an_animation);
+        match sender.send(an_animation) {
+            Ok(_) => {},
+            Err(e) => {println!("Cannot send message to thread {}", e)},
+        };
     }
-    // remove temp frames
+    //TODO remove temp frames
 }
 
 pub fn deactivate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
