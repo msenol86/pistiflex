@@ -66,7 +66,10 @@ pub const WIN_HEIGHT: i32 = 800;
 pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
-pub const ANIM_SPEED: f64 = 0.01;
+pub const ANIM_SPEED: f64 = 0.001;
+pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
+pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
+pub const DC_ANIM_TIME: f64 = 50.0; // distribute cards animation time
 
 pub fn game_over_on_ui(win_clone: &mut DoubleWindow, s: String) {
     let t_index = win_clone.children();
@@ -269,9 +272,8 @@ pub fn move_card_animation(
         get_player_cards_on_ui(ba.row, &avaiable_top_cards, bottom_cards, ba.card_index);
     card_to_hide.to_owned().hide();
     let (x, y) = get_pos_for_new_card_on_board(cards_on_board, boardx, boardy);
-    let time = 50.0;
-    let time_len = time as usize;
-    let st = series_xy(ba.startx, x, ba.starty, y, time);
+    let time_len = MC_ANIM_TIME as usize;
+    let st = series_xy(ba.startx, x, ba.starty, y, MC_ANIM_TIME);
     let series_x = st.0;
     let series_y = st.1;
     cards_on_board.push(new_but);
@@ -325,9 +327,9 @@ pub fn collect_cards_on_ui(
 
     for (i, _) in cards_on_board.iter().enumerate().rev() {
         let mut a_card_frame = cards_on_board[i].to_owned();
-        let time = 10.0;
-        let time_len = time as usize;
-        let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, time);
+        
+        let time_len = CC_ANIM_TIME as usize;
+        let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, CC_ANIM_TIME);
         let series_x = st.0;
         let series_y = st.1;
         deactivate_all_bottom_cards(bottom_cards);
@@ -362,14 +364,14 @@ pub fn distribute_cards_on_ui(
             draw_card(&mut a_card_frame, a_card, true);
             insert_new_item_into_window(win_clone, &a_card_frame);
             a_card_frame_old.hide();
-            let time = 10.0;
-            let time_len = time as usize;
+            
+            let time_len = DC_ANIM_TIME as usize;
             let (series_x, series_y) = series_xy(
                 a_card_frame.x(),
                 player_cards[i].x(),
                 a_card_frame.y(),
                 player_cards[i].y(),
-                time,
+                DC_ANIM_TIME,
             );
 
             for i in 0..time_len {

@@ -1,7 +1,7 @@
 use fltk::{app, enums::{Color}, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
 
-use std::sync::mpsc::Sender;
+use std::{sync::mpsc::Sender, time::Duration};
 
 use crate::{
     game::{Card, Suit},
@@ -101,7 +101,8 @@ pub fn activate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
 }
 
 pub fn sleep_and_awake(anim_speed: f64) {
-    app::sleep(anim_speed);
+    // app::sleep(anim_speed);
+    spin_sleep::sleep(Duration::from_secs_f64(anim_speed));
     app::awake();
 }
 
