@@ -46,11 +46,13 @@ pub fn card_into_filename(card: Card) -> String {
 
 pub fn draw_card(a_button: &mut Frame, card: Card, hidden: bool) {
     let filename = card_into_filename(card);
-    let mut path = format!("src/img/{}.svg.png", filename);
-    if hidden {
-        path = "src/img/2B.svg.png".to_string();
-    }
-    match image::PngImage::load(path) {
+    // let mut path = format!("src/img/{}.svg.png", filename);
+    let path = if hidden {
+        "src/img/2B.svg.png".to_string()
+    } else {
+        format!("src/img/{}.svg.png", filename)
+    };
+    match image::PngImage::load(path.clone()) {
         Ok(mut kk) => a_button.to_owned().draw({
             move |f| {
                 kk.scale(f.width(), f.height(), true, true);
@@ -60,7 +62,7 @@ pub fn draw_card(a_button: &mut Frame, card: Card, hidden: bool) {
         Err(e) => {
             println!(
                 "error loading png for filename: {} with error: {}",
-                filename, e
+                &path, e
             )
         }
     };
