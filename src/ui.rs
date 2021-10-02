@@ -68,12 +68,11 @@ pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
 
-// pub const ANIM_SPEED: f64 = if cfg!(windows) {
-//     0.001
-// } else {
-//     0.005
-// };
-pub const ANIM_SPEED: f64 = 0.001;
+pub const ANIM_SPEED: f64 = if cfg!(windows) {
+    0.001
+} else {
+    0.004
+};
 pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
 pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
 pub const DC_ANIM_TIME: f64 = 50.0; // distribute cards animation time
@@ -333,7 +332,8 @@ pub fn collect_cards_on_ui(
         Player::Player1 => (Row::Bottom, boardx, WIN_HEIGHT),
         Player::Player2 => (Row::Top, boardx, 0 - CARD_H),
     };
-
+    deactivate_all_bottom_cards(bottom_cards);
+    sleep_and_awake(0.5, sleeper);
     for (i, _) in cards_on_board.iter().enumerate().rev() {
         let mut a_card_frame = cards_on_board[i].to_owned();
         
@@ -341,14 +341,14 @@ pub fn collect_cards_on_ui(
         let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, CC_ANIM_TIME);
         let series_x = st.0;
         let series_y = st.1;
-        deactivate_all_bottom_cards(bottom_cards);
+        
         for i in 0..time_len {
             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
             sleep_and_awake(ANIM_SPEED, sleeper);
             a_card_frame.parent().unwrap().redraw();
         }
-        activate_all_bottom_cards(bottom_cards);
     }
+    activate_all_bottom_cards(bottom_cards);
     *cards_on_board = Vec::new();
 }
 

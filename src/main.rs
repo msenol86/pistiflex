@@ -21,7 +21,7 @@ mod test;
 
 fn main() {
     let sleeper = SpinSleeper::new(1_000_000); 
-    // println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
+    println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
     // native sleep accuracy on linux: 125000
     // native sleep accuracy on windo: 1000000
     let mut my_game = Game::new();
@@ -86,7 +86,6 @@ fn main() {
                     sleeper
                 ),
                 ThreadMessage::CC(cc) => {
-                    sleep_and_awake(0.5, sleeper);
                     collect_cards_on_ui(cc, boardx, boardy, &mut cards_on_board, &mut bottom_cards, sleeper)
                 }
                 ThreadMessage::DC(dc) => distribute_cards_on_ui(
