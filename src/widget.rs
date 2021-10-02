@@ -1,5 +1,6 @@
 use fltk::{app, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
+use spin_sleep::SpinSleeper;
 
 use std::{sync::mpsc::Sender, time::Duration};
 
@@ -96,13 +97,8 @@ pub fn activate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
     }
 }
 
-pub fn sleep_and_awake(anim_speed: f64) {
-    // if cfg!(windows) {
-    //     spin_sleep::sleep(Duration::from_secs_f64(anim_speed));
-    // } else {
-    //     app::sleep(anim_speed);
-    // }
-    spin_sleep::sleep(Duration::from_secs_f64(anim_speed));
+pub fn sleep_and_awake(anim_speed: f64, sleeper: SpinSleeper) {
+    sleeper.sleep_s(anim_speed);
     app::awake();
 }
 

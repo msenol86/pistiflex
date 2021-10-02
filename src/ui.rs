@@ -1,6 +1,7 @@
 use std::{sync::Mutex};
 
 use fltk::{app::{self}, enums::{self}, frame::{self, Frame}, prelude::*, window::{DoubleWindow}};
+use spin_sleep::SpinSleeper;
 
 use crate::{
     game::{Card, Game, Player},
@@ -67,11 +68,12 @@ pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
 
-pub const ANIM_SPEED: f64 = if cfg!(windows) {
-    0.001
-} else {
-    0.005
-};
+// pub const ANIM_SPEED: f64 = if cfg!(windows) {
+//     0.001
+// } else {
+//     0.005
+// };
+pub const ANIM_SPEED: f64 = 0.001;
 pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
 pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
 pub const DC_ANIM_TIME: f64 = 50.0; // distribute cards animation time
@@ -263,6 +265,7 @@ pub fn move_card_animation(
     cards_on_board_lasty: &Mutex<i32>,
     boardx: i32,
     boardy: i32,
+    sleeper: SpinSleeper
 ) {
     // let t_index = win_clone.children();
     let mut new_but = button_constructor(format!("{}", ba.card))
@@ -290,7 +293,7 @@ pub fn move_card_animation(
             .unwrap()
             .to_owned()
             .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-        sleep_and_awake(ANIM_SPEED);
+        sleep_and_awake(ANIM_SPEED, sleeper);
         cards_on_board
             .last()
             .unwrap()
@@ -324,6 +327,7 @@ pub fn collect_cards_on_ui(
     _boardy: i32,
     cards_on_board: &mut Vec<Frame>,
     bottom_cards: &mut Vec<Frame>,
+    sleeper: SpinSleeper
 ) {
     let (_, endx, endy) = match cc.player {
         Player::Player1 => (Row::Bottom, boardx, WIN_HEIGHT),
@@ -340,7 +344,7 @@ pub fn collect_cards_on_ui(
         deactivate_all_bottom_cards(bottom_cards);
         for i in 0..time_len {
             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-            sleep_and_awake(ANIM_SPEED);
+            sleep_and_awake(ANIM_SPEED, sleeper);
             a_card_frame.parent().unwrap().redraw();
         }
         activate_all_bottom_cards(bottom_cards);
@@ -354,6 +358,7 @@ pub fn distribute_cards_on_ui(
     p_top_cards: &mut Vec<Frame>,
     cards_on_decs: &mut Vec<Frame>,
     win_clone: &mut DoubleWindow,
+    sleeper: SpinSleeper
 ) {
     for (player_cards, player_hand, hidden) in [
         (p_top_cards, dc.top_hand, true),
@@ -381,7 +386,7 @@ pub fn distribute_cards_on_ui(
 
             for i in 0..time_len {
                 a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                sleep_and_awake(ANIM_SPEED);
+                sleep_and_awake(ANIM_SPEED, sleeper);
                 a_card_frame.parent().unwrap().redraw();
             }
             a_card_frame.hide();
