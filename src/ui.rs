@@ -66,7 +66,12 @@ pub const WIN_HEIGHT: i32 = 800;
 pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
-pub const ANIM_SPEED: f64 = 0.001;
+
+pub const ANIM_SPEED: f64 = if cfg!(windows) {
+    0.001
+} else {
+    0.005
+};
 pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
 pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
 pub const DC_ANIM_TIME: f64 = 50.0; // distribute cards animation time

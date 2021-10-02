@@ -1,11 +1,11 @@
-use fltk::{app, enums::{Color}, frame::Frame, image, prelude::*, window::DoubleWindow};
+use fltk::{app, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
 use fltk_theme::widget_themes;
 
 use std::{sync::mpsc::Sender, time::Duration};
 
 use crate::{
     game::{Card, Suit},
-    ui::ThreadMessage, 
+    ui::ThreadMessage,
 };
 
 pub fn button_constructor(a_label: String) -> Frame {
@@ -68,21 +68,17 @@ pub fn draw_card(a_button: &mut Frame, card: Card, hidden: bool) {
     };
 }
 
-pub fn draw_game(
-    animations: Vec<ThreadMessage>,
-    sender: Sender<ThreadMessage>,
-) {
+pub fn draw_game(animations: Vec<ThreadMessage>, sender: Sender<ThreadMessage>) {
     draw_animations(animations, sender);
 }
 
-pub fn draw_animations(
-    animations: Vec<ThreadMessage>,
-    sender: Sender<ThreadMessage>,
-) {
+pub fn draw_animations(animations: Vec<ThreadMessage>, sender: Sender<ThreadMessage>) {
     for an_animation in animations {
         match sender.send(an_animation) {
-            Ok(_) => {},
-            Err(e) => {println!("Cannot send message to thread {}", e)},
+            Ok(_) => {}
+            Err(e) => {
+                println!("Cannot send message to thread {}", e)
+            }
         };
     }
     //TODO remove temp frames
@@ -101,13 +97,20 @@ pub fn activate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
 }
 
 pub fn sleep_and_awake(anim_speed: f64) {
-    // app::sleep(anim_speed);
+    // if cfg!(windows) {
+    //     spin_sleep::sleep(Duration::from_secs_f64(anim_speed));
+    // } else {
+    //     app::sleep(anim_speed);
+    // }
     spin_sleep::sleep(Duration::from_secs_f64(anim_speed));
     app::awake();
 }
 
-pub fn insert_new_item_into_window<'a>(win: &'a mut DoubleWindow, a_frame: &Frame) -> &'a mut DoubleWindow {
+pub fn insert_new_item_into_window<'a>(
+    win: &'a mut DoubleWindow,
+    a_frame: &Frame,
+) -> &'a mut DoubleWindow {
     let t_index = win.children();
     win.insert(a_frame, t_index);
-    return win;   
+    return win;
 }

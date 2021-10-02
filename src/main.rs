@@ -10,6 +10,7 @@ use fltk::{app, frame::{Frame}, prelude::*, window::{Window}};
 use fltk_theme::{ThemeType, WidgetTheme};
 
 use game::Game;
+use spin_sleep::SpinSleeper;
 use std::sync::mpsc;
 
 use crate::{
@@ -25,6 +26,9 @@ mod test;
 
 
 fn main() {
+    let sleeper = SpinSleeper::default(); 
+    println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
+    // native sleep accuracy on linux: 125000
     let mut my_game = Game::new();
     my_game.start_game_and_give_cards_to_players();
     let a = app::App::default();
