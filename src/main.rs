@@ -13,7 +13,7 @@ use game::Game;
 use spin_sleep::SpinSleeper;
 use std::sync::mpsc;
 
-use crate::{game::{Card, WinStatus, Player}, ui::*, widget::{draw_game, sleep_and_awake}};
+use crate::{game::{Card, WinStatus, Player}, ui::*, widget::draw_game};
 
 #[cfg(test)]
 mod test;

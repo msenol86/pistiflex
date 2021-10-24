@@ -2,7 +2,7 @@ use fltk::{app, enums::Color, frame::Frame, image, prelude::*, window::DoubleWin
 use fltk_theme::widget_themes;
 use spin_sleep::SpinSleeper;
 
-use std::{sync::mpsc::Sender, time::Duration};
+use std::sync::mpsc::Sender;
 
 use crate::{
     game::{Card, Suit},
