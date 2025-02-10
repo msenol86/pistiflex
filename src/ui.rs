@@ -46,7 +46,6 @@ pub enum ThreadMessage {
     CC(CollectCards),
     DC(DistributeCards),
     GameOver(String),
-    ChangeSpeed(u32),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -84,7 +83,7 @@ pub fn game_over_on_ui(win_clone: &mut DoubleWindow, s: String) {
         .with_size(400, 50)
         .with_label(s.as_str());
     win_clone.insert(&b, t_index);
-    b.center_of_parent();
+    b.center_of(win_clone);
     app::awake();
 }
 
@@ -182,23 +181,35 @@ pub fn draw_and_set_callbacks_on_ui(
     bottom_cards_values: &mut Vec<Card>,
     but_inc: &mut Button,
     but_dec: &mut Button,
+    anim_speed: Arc<Mutex<u8>>,
+    speed_text: &mut Button,
     app_sender: &app::Sender<FltkMessage>,
 ) {
-    let fltk_sender_inc = app_sender.clone();
-    let fltk_sender_dec = app_sender.clone();
-    but_inc.to_owned().set_callback(move|b| {
+    
+    
+    let anim_speed_inc_clone = anim_speed.clone();
+    let anim_speed_dec_clone = anim_speed.clone();
+    
+    let mut speed_text_inc_clone = speed_text.clone();
+    let mut speed_text_dec_clone = speed_text.clone();
+
+    but_inc.to_owned().set_callback(move|_b| {
         println!("Increase button pushed");
-        b.to_owned().emit(
-            fltk_sender_inc.to_owned(),
-            FltkMessage::UI(1)
-        )
+        let mut anim_speed_write_clone = anim_speed_inc_clone.lock().unwrap();
+        if *anim_speed_write_clone > 1 {
+            *anim_speed_write_clone -= 1;
+            println!("Animation Speed Increased to {}", anim_speed_write_clone)
+        }
+        speed_text_inc_clone.set_label(format!("{}", anim_speed_write_clone).as_str()); 
     });
-    but_dec.to_owned().set_callback(move|b| {
+    but_dec.to_owned().set_callback(move|_b| {
         println!("Decrease button pushed");
-        b.to_owned().emit(
-            fltk_sender_dec.to_owned(),
-            FltkMessage::UI(2)
-        )
+        let mut anim_speed_write_clone = anim_speed_dec_clone.lock().unwrap();
+        if *anim_speed_write_clone < 9 {
+            *anim_speed_write_clone += 1;
+            println!("Animation Speed Decreased to {}", anim_speed_write_clone)
+        }
+        speed_text_dec_clone.set_label(format!("{}", anim_speed_write_clone).as_str());
     });
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {

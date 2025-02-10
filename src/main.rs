@@ -6,7 +6,7 @@ mod widget;
 
 use std::{sync::Arc, sync::Mutex, thread};
 
-use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window, text::TextDisplay};
+use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 use fltk_theme::{ThemeType, WidgetTheme};
 
 use game::Game;
@@ -68,6 +68,8 @@ fn main() {
 
     let (but_w, but_h) = (reference_card_frame.w(), reference_card_frame.h());
 
+    let anim_speed_write_clone = Arc::clone(&anim_speed);
+
     draw_and_set_callbacks_on_ui(
         &mut top_cards,
         &mut bottom_cards,
@@ -75,6 +77,8 @@ fn main() {
         &mut bottom_cards_values,
         &mut but_inc,
         &mut but_dec,
+        anim_speed_write_clone,
+        &mut speed_text,
         &s,
     );
 
@@ -82,23 +86,6 @@ fn main() {
     let _animator = thread::spawn(move || loop {
         if let Ok(msg) = t_r.recv() {
             match msg {
-                ThreadMessage::ChangeSpeed(change_speed) => {
-                    let anim_speed_write_clone = Arc::clone(&anim_speed);
-                    let mut anim_speed_write_clone = anim_speed_write_clone.lock().unwrap();
-                    if change_speed == 1 { 
-                        if *anim_speed_write_clone > 1 {
-                            *anim_speed_write_clone -= 1;
-                            println!("Animation Speed Increased to {}", anim_speed_write_clone)
-                        }
-                    } else if change_speed == 2 {
-                        if *anim_speed_write_clone < 9 {
-                            *anim_speed_write_clone += 1;
-                            println!("Animation Speed Decreased to {}", anim_speed_write_clone)
-                        }
-                    }
-                    speed_text.set_label(format!("{}", anim_speed_write_clone).as_str());
-                    // win_clone.set_label(format!("Game Speed: {}", *anim_speed_write_clone).as_str());
-                }
                 ThreadMessage::MC(ba) => {
                     let anim_speed_clone = Arc::clone(&anim_speed);
                     move_card_animation(
@@ -152,12 +139,6 @@ fn main() {
             match fltk_msg {
                 FltkMessage::UI(ui_code) => {
                     println!("recevied code: {}", ui_code);
-                    match t_s.send(ThreadMessage::ChangeSpeed(ui_code)) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            println!("Cannot send message to thread {}", e)
-                        }
-                    };
                 }
                 FltkMessage::EM(msg) => {
                     // println!("eventmessage: {:#?}", msg);
