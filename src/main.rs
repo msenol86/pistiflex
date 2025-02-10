@@ -1,26 +1,30 @@
 // #![windows_subsystem = "windows"]
 mod calc;
 mod game;
-mod widget;
 mod ui;
+mod widget;
 
-use std::{sync::Mutex, thread};
+use std::{sync::Arc, sync::Mutex, thread};
 
-use fltk::{app, frame::{Frame}, prelude::*, window::{Window}};
+use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window, text::TextDisplay};
 use fltk_theme::{ThemeType, WidgetTheme};
 
 use game::Game;
 use spin_sleep::SpinSleeper;
 use std::sync::mpsc;
 
-use crate::{game::{Card, WinStatus, Player}, ui::*, widget::draw_game};
+use crate::{
+    game::{Card, Player, WinStatus},
+    ui::*,
+    widget::draw_game,
+};
 
 #[cfg(test)]
 mod test;
 
-
 fn main() {
-    let sleeper = SpinSleeper::new(1_000_000); 
+    let sleeper = SpinSleeper::new(1_000_000);
+    let anim_speed = Arc::new(Mutex::new(DEFAULT_ANIM_SPEED));
     println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
     // native sleep accuracy on linux: 125000
     // native sleep accuracy on windo: 1000000
@@ -34,7 +38,13 @@ fn main() {
     let mut win = Window::default()
         .with_size(WIN_WIDTH, WIN_HEIGHT)
         .with_label("Pisti");
-
+    let mut frame = Frame::new(0, 0, 400, 300, "");
+    let mut but_inc = Button::new(10, 10, 80, 40, "+");
+    let mut but_dec = Button::new(10, 60, 80, 40, "-");
+    let mut speed_text = Button::new(10, 120, 80, 40, "");
+    speed_text.deactivate();
+    speed_text.set_label(format!("{}", DEFAULT_ANIM_SPEED).as_str());
+    
     let mut top_cards = create_4_cards_on_center();
     let mut bottom_cards = create_4_cards_on_center();
     let top_cards_immut: Vec<Frame> = top_cards.iter().map(|f| f.clone()).collect();
@@ -63,6 +73,8 @@ fn main() {
         &mut bottom_cards,
         &my_game,
         &mut bottom_cards_values,
+        &mut but_inc,
+        &mut but_dec,
         &s,
     );
 
@@ -70,32 +82,66 @@ fn main() {
     let _animator = thread::spawn(move || loop {
         if let Ok(msg) = t_r.recv() {
             match msg {
-                ThreadMessage::MC(ba) => move_card_animation(
-                    &mut win_clone,
-                    ba,
-                    &top_cards,
-                    &bottom_cards,
-                    &mut cards_on_board,
-                    but_w,
-                    but_h,
-                    &reference_card_frame,
-                    &cards_on_board_lastx,
-                    &cards_on_board_lasty,
-                    boardx,
-                    boardy,
-                    sleeper
-                ),
-                ThreadMessage::CC(cc) => {
-                    collect_cards_on_ui(cc, boardx, boardy, &mut cards_on_board, &mut bottom_cards, sleeper)
+                ThreadMessage::ChangeSpeed(change_speed) => {
+                    let anim_speed_write_clone = Arc::clone(&anim_speed);
+                    let mut anim_speed_write_clone = anim_speed_write_clone.lock().unwrap();
+                    if change_speed == 1 { 
+                        if *anim_speed_write_clone > 1 {
+                            *anim_speed_write_clone -= 1;
+                            println!("Animation Speed Increased to {}", anim_speed_write_clone)
+                        }
+                    } else if change_speed == 2 {
+                        if *anim_speed_write_clone < 9 {
+                            *anim_speed_write_clone += 1;
+                            println!("Animation Speed Decreased to {}", anim_speed_write_clone)
+                        }
+                    }
+                    speed_text.set_label(format!("{}", anim_speed_write_clone).as_str());
+                    // win_clone.set_label(format!("Game Speed: {}", *anim_speed_write_clone).as_str());
                 }
-                ThreadMessage::DC(dc) => distribute_cards_on_ui(
-                    dc,
-                    &mut bottom_cards,
-                    &mut top_cards,
-                    &mut cards_on_decs,
-                    &mut win_clone,
-                    sleeper
-                ),
+                ThreadMessage::MC(ba) => {
+                    let anim_speed_clone = Arc::clone(&anim_speed);
+                    move_card_animation(
+                        &mut win_clone,
+                        ba,
+                        &top_cards,
+                        &bottom_cards,
+                        &mut cards_on_board,
+                        but_w,
+                        but_h,
+                        &reference_card_frame,
+                        &cards_on_board_lastx,
+                        &cards_on_board_lasty,
+                        boardx,
+                        boardy,
+                        sleeper,
+                        anim_speed_clone,
+                    )
+                }
+                ThreadMessage::CC(cc) => {
+                    let anim_speed_clone = Arc::clone(&anim_speed);
+                    collect_cards_on_ui(
+                        cc,
+                        boardx,
+                        boardy,
+                        &mut cards_on_board,
+                        &mut bottom_cards,
+                        sleeper,
+                        anim_speed_clone,
+                    )
+                }
+                ThreadMessage::DC(dc) => {
+                    let anim_speed_clone = Arc::clone(&anim_speed);
+                    distribute_cards_on_ui(
+                        dc,
+                        &mut bottom_cards,
+                        &mut top_cards,
+                        &mut cards_on_decs,
+                        &mut win_clone,
+                        sleeper,
+                        anim_speed_clone,
+                    )
+                }
                 ThreadMessage::GameOver(s) => game_over_on_ui(&mut win_clone, s),
             }
         }
@@ -106,6 +152,12 @@ fn main() {
             match fltk_msg {
                 FltkMessage::UI(ui_code) => {
                     println!("recevied code: {}", ui_code);
+                    match t_s.send(ThreadMessage::ChangeSpeed(ui_code)) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("Cannot send message to thread {}", e)
+                        }
+                    };
                 }
                 FltkMessage::EM(msg) => {
                     // println!("eventmessage: {:#?}", msg);

@@ -1,6 +1,6 @@
-use std::{sync::Mutex};
+use std::sync::{Arc, Mutex};
 
-use fltk::{app::{self}, enums::{self}, frame::{self, Frame}, prelude::*, window::{DoubleWindow}};
+use fltk::{app::{self}, enums::{self}, frame::{self, Frame}, button::Button, prelude::*, window::{DoubleWindow}};
 use spin_sleep::SpinSleeper;
 
 use crate::{
@@ -46,6 +46,7 @@ pub enum ThreadMessage {
     CC(CollectCards),
     DC(DistributeCards),
     GameOver(String),
+    ChangeSpeed(u32),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -68,10 +69,10 @@ pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
 
-pub const ANIM_SPEED: f64 = if cfg!(windows) {
-    0.001
+pub const DEFAULT_ANIM_SPEED: u8 = if cfg!(windows) {
+    9
 } else {
-    0.004
+    6
 };
 pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
 pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
@@ -179,8 +180,26 @@ pub fn draw_and_set_callbacks_on_ui(
     bottom_cards: &mut Vec<Frame>,
     my_game: &Game,
     bottom_cards_values: &mut Vec<Card>,
+    but_inc: &mut Button,
+    but_dec: &mut Button,
     app_sender: &app::Sender<FltkMessage>,
 ) {
+    let fltk_sender_inc = app_sender.clone();
+    let fltk_sender_dec = app_sender.clone();
+    but_inc.to_owned().set_callback(move|b| {
+        println!("Increase button pushed");
+        b.to_owned().emit(
+            fltk_sender_inc.to_owned(),
+            FltkMessage::UI(1)
+        )
+    });
+    but_dec.to_owned().set_callback(move|b| {
+        println!("Decrease button pushed");
+        b.to_owned().emit(
+            fltk_sender_dec.to_owned(),
+            FltkMessage::UI(2)
+        )
+    });
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {
             let fltk_sender = app_sender.clone();
@@ -264,7 +283,8 @@ pub fn move_card_animation(
     cards_on_board_lasty: &Mutex<i32>,
     boardx: i32,
     boardy: i32,
-    sleeper: SpinSleeper
+    sleeper: SpinSleeper,
+    anim_speed: Arc<Mutex<u8>>
 ) {
     // let t_index = win_clone.children();
     let mut new_but = button_constructor(format!("{}", ba.card))
@@ -292,7 +312,7 @@ pub fn move_card_animation(
             .unwrap()
             .to_owned()
             .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-        sleep_and_awake(ANIM_SPEED, sleeper);
+        sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
         cards_on_board
             .last()
             .unwrap()
@@ -326,7 +346,8 @@ pub fn collect_cards_on_ui(
     _boardy: i32,
     cards_on_board: &mut Vec<Frame>,
     bottom_cards: &mut Vec<Frame>,
-    sleeper: SpinSleeper
+    sleeper: SpinSleeper,
+    anim_speed: Arc<Mutex<u8>>
 ) {
     let (_, endx, endy) = match cc.player {
         Player::Player1 => (Row::Bottom, boardx, WIN_HEIGHT),
@@ -344,7 +365,7 @@ pub fn collect_cards_on_ui(
         
         for i in 0..time_len {
             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-            sleep_and_awake(ANIM_SPEED, sleeper);
+            sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
             a_card_frame.parent().unwrap().redraw();
         }
     }
@@ -358,7 +379,8 @@ pub fn distribute_cards_on_ui(
     p_top_cards: &mut Vec<Frame>,
     cards_on_decs: &mut Vec<Frame>,
     win_clone: &mut DoubleWindow,
-    sleeper: SpinSleeper
+    sleeper: SpinSleeper,
+    anim_speed: Arc<Mutex<u8>>
 ) {
     for (player_cards, player_hand, hidden) in [
         (p_top_cards, dc.top_hand, true),
@@ -386,7 +408,7 @@ pub fn distribute_cards_on_ui(
 
             for i in 0..time_len {
                 a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                sleep_and_awake(ANIM_SPEED, sleeper);
+                sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
                 a_card_frame.parent().unwrap().redraw();
             }
             a_card_frame.hide();
