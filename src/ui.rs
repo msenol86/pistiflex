@@ -1,17 +1,24 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{atomic::Ordering, Mutex};
 
-use fltk::{app::{self}, enums::{self}, frame::{self, Frame}, button::Button, prelude::*, window::{DoubleWindow}};
+use fltk::{
+    app::{self},
+    button::Button,
+    enums::{self},
+    frame::{self, Frame},
+    prelude::*,
+    window::DoubleWindow,
+};
 use spin_sleep::SpinSleeper;
 
 use crate::{
+    calc::series_xy,
     game::{Card, Game, Player},
     widget::{
-        activate_all_bottom_cards, deactivate_all_bottom_cards, draw_card, 
-        insert_new_item_into_window, sleep_and_awake, button_constructor
+        activate_all_bottom_cards, button_constructor, deactivate_all_bottom_cards, draw_card,
+        insert_new_item_into_window, sleep_and_awake,
     },
-    calc::series_xy
+    ANIM_SPEED,
 };
-
 
 #[derive(Clone, Debug)]
 pub enum Row {
@@ -61,18 +68,12 @@ pub enum FltkMessage {
     UI(u32),
 }
 
-
 pub const WIN_WIDTH: i32 = 800;
 pub const WIN_HEIGHT: i32 = 800;
 pub const CARD_H: i32 = 204;
 pub const CARD_W: i32 = 144;
 pub const CARD_MARGIN: i32 = 110;
 
-pub const DEFAULT_ANIM_SPEED: u8 = if cfg!(windows) {
-    9
-} else {
-    6
-};
 pub const MC_ANIM_TIME: f64 = 100.0; // move cards animation time
 pub const CC_ANIM_TIME: f64 = 50.0; // collect cards animation time
 pub const DC_ANIM_TIME: f64 = 50.0; // distribute cards animation time
@@ -181,35 +182,33 @@ pub fn draw_and_set_callbacks_on_ui(
     bottom_cards_values: &mut Vec<Card>,
     but_inc: &mut Button,
     but_dec: &mut Button,
-    anim_speed: Arc<Mutex<u8>>,
     speed_text: &mut Button,
     app_sender: &app::Sender<FltkMessage>,
 ) {
-    
-    
-    let anim_speed_inc_clone = anim_speed.clone();
-    let anim_speed_dec_clone = anim_speed.clone();
-    
     let mut speed_text_inc_clone = speed_text.clone();
     let mut speed_text_dec_clone = speed_text.clone();
 
-    but_inc.to_owned().set_callback(move|_b| {
+    but_inc.to_owned().set_callback(move |_b| {
         println!("Increase button pushed");
-        let mut anim_speed_write_clone = anim_speed_inc_clone.lock().unwrap();
-        if *anim_speed_write_clone > 1 {
-            *anim_speed_write_clone -= 1;
-            println!("Animation Speed Increased to {}", anim_speed_write_clone)
+        if ANIM_SPEED.load(Ordering::Relaxed) > 1 {
+            ANIM_SPEED.store(ANIM_SPEED.load(Ordering::Relaxed) - 1, Ordering::Relaxed);
+            println!(
+                "Animation Speed Increased to {}",
+                ANIM_SPEED.load(Ordering::Relaxed)
+            )
         }
-        speed_text_inc_clone.set_label(format!("{}", anim_speed_write_clone).as_str()); 
+        speed_text_inc_clone.set_label(format!("{}", ANIM_SPEED.load(Ordering::Relaxed)).as_str());
     });
-    but_dec.to_owned().set_callback(move|_b| {
+    but_dec.to_owned().set_callback(move |_b| {
         println!("Decrease button pushed");
-        let mut anim_speed_write_clone = anim_speed_dec_clone.lock().unwrap();
-        if *anim_speed_write_clone < 9 {
-            *anim_speed_write_clone += 1;
-            println!("Animation Speed Decreased to {}", anim_speed_write_clone)
+        if ANIM_SPEED.load(Ordering::Relaxed) < 9 {
+            ANIM_SPEED.store(ANIM_SPEED.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
+            println!(
+                "Animation Speed Decreased to {}",
+                ANIM_SPEED.load(Ordering::Relaxed)
+            )
         }
-        speed_text_dec_clone.set_label(format!("{}", anim_speed_write_clone).as_str());
+        speed_text_dec_clone.set_label(format!("{}", ANIM_SPEED.load(Ordering::Relaxed)).as_str());
     });
     for (j, a_vec) in [&top_cards, &bottom_cards].iter().enumerate() {
         for (i, a_but) in a_vec.iter().enumerate() {
@@ -259,8 +258,6 @@ pub fn create_4_cards_on_center() -> Vec<Frame> {
         .collect()
 }
 
-
-
 pub fn get_avaiable_cards_on_ui(card_frames: &Vec<Frame>) -> Vec<Frame> {
     return card_frames
         .iter()
@@ -295,7 +292,6 @@ pub fn move_card_animation(
     boardx: i32,
     boardy: i32,
     sleeper: SpinSleeper,
-    anim_speed: Arc<Mutex<u8>>
 ) {
     // let t_index = win_clone.children();
     let mut new_but = button_constructor(format!("{}", ba.card))
@@ -323,7 +319,7 @@ pub fn move_card_animation(
             .unwrap()
             .to_owned()
             .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-        sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
+        sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
         cards_on_board
             .last()
             .unwrap()
@@ -358,7 +354,6 @@ pub fn collect_cards_on_ui(
     cards_on_board: &mut Vec<Frame>,
     bottom_cards: &mut Vec<Frame>,
     sleeper: SpinSleeper,
-    anim_speed: Arc<Mutex<u8>>
 ) {
     let (_, endx, endy) = match cc.player {
         Player::Player1 => (Row::Bottom, boardx, WIN_HEIGHT),
@@ -368,15 +363,15 @@ pub fn collect_cards_on_ui(
     sleep_and_awake(0.5, sleeper);
     for (i, _) in cards_on_board.iter().enumerate().rev() {
         let mut a_card_frame = cards_on_board[i].to_owned();
-        
+
         let time_len = CC_ANIM_TIME as usize;
         let st = series_xy(a_card_frame.x(), endx, a_card_frame.y(), endy, CC_ANIM_TIME);
         let series_x = st.0;
         let series_y = st.1;
-        
+
         for i in 0..time_len {
             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-            sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
+            sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
             a_card_frame.parent().unwrap().redraw();
         }
     }
@@ -391,7 +386,6 @@ pub fn distribute_cards_on_ui(
     cards_on_decs: &mut Vec<Frame>,
     win_clone: &mut DoubleWindow,
     sleeper: SpinSleeper,
-    anim_speed: Arc<Mutex<u8>>
 ) {
     for (player_cards, player_hand, hidden) in [
         (p_top_cards, dc.top_hand, true),
@@ -407,7 +401,7 @@ pub fn distribute_cards_on_ui(
             draw_card(&mut a_card_frame, a_card, true);
             insert_new_item_into_window(win_clone, &a_card_frame);
             a_card_frame_old.hide();
-            
+
             let time_len = DC_ANIM_TIME as usize;
             let (series_x, series_y) = series_xy(
                 a_card_frame.x(),
@@ -419,7 +413,7 @@ pub fn distribute_cards_on_ui(
 
             for i in 0..time_len {
                 a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                sleep_and_awake(f64::from(*anim_speed.lock().unwrap()) / 10000.0, sleeper);
+                sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
                 a_card_frame.parent().unwrap().redraw();
             }
             a_card_frame.hide();
@@ -432,4 +426,3 @@ pub fn distribute_cards_on_ui(
 
     app::awake();
 }
-

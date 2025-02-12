@@ -4,10 +4,10 @@ mod game;
 mod ui;
 mod widget;
 
-use std::{sync::Arc, sync::Mutex, thread};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::{sync::Mutex, thread};
 
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
-// use fltk_theme::{ThemeType, WidgetTheme};
 
 use game::Game;
 use spin_sleep::SpinSleeper;
@@ -21,10 +21,10 @@ use crate::{
 
 #[cfg(test)]
 mod test;
+static ANIM_SPEED: AtomicU8 = AtomicU8::new(6);
 
 fn main() {
     let sleeper = SpinSleeper::new(1_000_000);
-    let anim_speed = Arc::new(Mutex::new(DEFAULT_ANIM_SPEED));
     println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
     // native sleep accuracy on linux: 125000
     // native sleep accuracy on windo: 1000000
@@ -33,7 +33,6 @@ fn main() {
     let a = app::App::default();
     let (s, r) = app::channel::<FltkMessage>();
     let (t_s, t_r) = mpsc::channel::<ThreadMessage>();
-    // WidgetTheme::new(ThemeType::Metro).apply();
 
     let mut win = Window::default()
         .with_size(WIN_WIDTH, WIN_HEIGHT)
@@ -43,8 +42,8 @@ fn main() {
     let mut but_dec = Button::new(10, 60, 80, 40, "-");
     let mut speed_text = Button::new(10, 120, 80, 40, "");
     speed_text.deactivate();
-    speed_text.set_label(format!("{}", DEFAULT_ANIM_SPEED).as_str());
-    
+    speed_text.set_label(format!("{}", ANIM_SPEED.load(Ordering::Relaxed)).as_str());
+
     let mut top_cards = create_4_cards_on_center();
     let mut bottom_cards = create_4_cards_on_center();
     let top_cards_immut: Vec<Frame> = top_cards.iter().map(|f| f.clone()).collect();
@@ -68,8 +67,6 @@ fn main() {
 
     let (but_w, but_h) = (reference_card_frame.w(), reference_card_frame.h());
 
-    let anim_speed_write_clone = Arc::clone(&anim_speed);
-
     draw_and_set_callbacks_on_ui(
         &mut top_cards,
         &mut bottom_cards,
@@ -77,7 +74,6 @@ fn main() {
         &mut bottom_cards_values,
         &mut but_inc,
         &mut but_dec,
-        anim_speed_write_clone,
         &mut speed_text,
         &s,
     );
@@ -86,49 +82,37 @@ fn main() {
     let _animator = thread::spawn(move || loop {
         if let Ok(msg) = t_r.recv() {
             match msg {
-                ThreadMessage::MC(ba) => {
-                    let anim_speed_clone = Arc::clone(&anim_speed);
-                    move_card_animation(
-                        &mut win_clone,
-                        ba,
-                        &top_cards,
-                        &bottom_cards,
-                        &mut cards_on_board,
-                        but_w,
-                        but_h,
-                        &reference_card_frame,
-                        &cards_on_board_lastx,
-                        &cards_on_board_lasty,
-                        boardx,
-                        boardy,
-                        sleeper,
-                        anim_speed_clone,
-                    )
-                }
-                ThreadMessage::CC(cc) => {
-                    let anim_speed_clone = Arc::clone(&anim_speed);
-                    collect_cards_on_ui(
-                        cc,
-                        boardx,
-                        boardy,
-                        &mut cards_on_board,
-                        &mut bottom_cards,
-                        sleeper,
-                        anim_speed_clone,
-                    )
-                }
-                ThreadMessage::DC(dc) => {
-                    let anim_speed_clone = Arc::clone(&anim_speed);
-                    distribute_cards_on_ui(
-                        dc,
-                        &mut bottom_cards,
-                        &mut top_cards,
-                        &mut cards_on_decs,
-                        &mut win_clone,
-                        sleeper,
-                        anim_speed_clone,
-                    )
-                }
+                ThreadMessage::MC(ba) => move_card_animation(
+                    &mut win_clone,
+                    ba,
+                    &top_cards,
+                    &bottom_cards,
+                    &mut cards_on_board,
+                    but_w,
+                    but_h,
+                    &reference_card_frame,
+                    &cards_on_board_lastx,
+                    &cards_on_board_lasty,
+                    boardx,
+                    boardy,
+                    sleeper,
+                ),
+                ThreadMessage::CC(cc) => collect_cards_on_ui(
+                    cc,
+                    boardx,
+                    boardy,
+                    &mut cards_on_board,
+                    &mut bottom_cards,
+                    sleeper,
+                ),
+                ThreadMessage::DC(dc) => distribute_cards_on_ui(
+                    dc,
+                    &mut bottom_cards,
+                    &mut top_cards,
+                    &mut cards_on_decs,
+                    &mut win_clone,
+                    sleeper,
+                ),
                 ThreadMessage::GameOver(s) => game_over_on_ui(&mut win_clone, s),
             }
         }
