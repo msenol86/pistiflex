@@ -1,8 +1,9 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering, AtomicI32};
 
 use fltk::{app, enums, frame::Frame, image::Pixmap, prelude::*, window::Window, button::Button};
 
 static A: AtomicBool = AtomicBool::new(true);
+static B: AtomicI32 = AtomicI32::new(0);
 
 
 const PXM: &[&str] = &[
@@ -71,6 +72,7 @@ fn move_image(mut frm: Frame, handle: app::TimeoutHandle) {
     //     x - 5
     // };
     frm.set_pos(newx, y);
+    B.store(x, Ordering::Relaxed);
     app::redraw();
     app::repeat_timeout3(0.016, handle);
     // if frm.x() > 440 {
@@ -88,7 +90,11 @@ fn main() {
         .with_label("timeout")
         .with_size(720, 486)
         .center_screen();
-    let button = Button::new(10, 10, 100, 50, "XXXXXXX");
+    let mut button = Button::new(10, 10, 100, 50, "Click Me!");
+    let mut button2 = Button::new(130, 10, 100, 50, "Test");
+    button.set_callback(move |_b| {
+        button2.set_label(format!("{}", B.load(Ordering::Relaxed)).as_str());
+    });
     let mut frame = Frame::new(-200, 150, 200, 200, "");
     let mut pxm = Pixmap::new(PXM).unwrap();
     pxm.scale(200, 200, true, true);
