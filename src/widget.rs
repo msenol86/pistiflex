@@ -1,5 +1,5 @@
 use fltk::{app, enums::Color, frame::Frame, image, prelude::*, window::DoubleWindow};
-use fltk_theme::widget_themes;
+// use fltk_theme::widget_themes;
 use spin_sleep::SpinSleeper;
 
 use std::sync::mpsc::Sender;
@@ -16,8 +16,8 @@ pub fn button_constructor(a_label: String) -> Frame {
 }
 
 pub fn _set_button_color(but: &Frame, suit: Suit) {
-    but.to_owned()
-        .set_frame(widget_themes::OS_DEFAULT_BUTTON_UP_BOX);
+    // but.to_owned()
+    //     .set_frame(widget_themes::OS_DEFAULT_BUTTON_UP_BOX);
     but.to_owned().set_label_size(24);
     match suit {
         Suit::Diamond | Suit::Heart => but.to_owned().set_label_color(Color::Red),

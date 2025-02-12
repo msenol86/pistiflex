@@ -7,7 +7,7 @@ mod widget;
 use std::{sync::Arc, sync::Mutex, thread};
 
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
-use fltk_theme::{ThemeType, WidgetTheme};
+// use fltk_theme::{ThemeType, WidgetTheme};
 
 use game::Game;
 use spin_sleep::SpinSleeper;
@@ -33,7 +33,7 @@ fn main() {
     let a = app::App::default();
     let (s, r) = app::channel::<FltkMessage>();
     let (t_s, t_r) = mpsc::channel::<ThreadMessage>();
-    WidgetTheme::new(ThemeType::Metro).apply();
+    // WidgetTheme::new(ThemeType::Metro).apply();
 
     let mut win = Window::default()
         .with_size(WIN_WIDTH, WIN_HEIGHT)
