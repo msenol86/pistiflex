@@ -11,4 +11,3 @@ fltk = {version = "1.1.19", features = ["fltk-bundled"]}
 strum = "0.21.0"
 strum_macros = "0.21.1"
 rand = "0.8.4"
-spin_sleep = "1.0.0"

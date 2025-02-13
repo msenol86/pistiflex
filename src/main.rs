@@ -10,7 +10,6 @@ use std::{sync::Mutex, thread};
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 
 use game::Game;
-use spin_sleep::SpinSleeper;
 use std::sync::mpsc;
 
 use crate::{
@@ -24,8 +23,6 @@ mod test;
 static ANIM_SPEED: AtomicU8 = AtomicU8::new(6);
 
 fn main() {
-    let sleeper = SpinSleeper::new(1_000_000);
-    println!("native sleep accuracy: {}", sleeper.native_accuracy_ns());
     // native sleep accuracy on linux: 125000
     // native sleep accuracy on windo: 1000000
     let mut my_game = Game::new();
@@ -95,7 +92,6 @@ fn main() {
                     &cards_on_board_lasty,
                     boardx,
                     boardy,
-                    sleeper,
                 ),
                 ThreadMessage::CC(cc) => collect_cards_on_ui(
                     cc,
@@ -103,7 +99,6 @@ fn main() {
                     boardy,
                     &mut cards_on_board,
                     &mut bottom_cards,
-                    sleeper,
                 ),
                 ThreadMessage::DC(dc) => distribute_cards_on_ui(
                     dc,
@@ -111,7 +106,6 @@ fn main() {
                     &mut top_cards,
                     &mut cards_on_decs,
                     &mut win_clone,
-                    sleeper,
                 ),
                 ThreadMessage::GameOver(s) => game_over_on_ui(&mut win_clone, s),
             }
