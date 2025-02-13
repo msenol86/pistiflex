@@ -97,9 +97,15 @@ pub fn activate_all_bottom_cards(bottom_card_frames: &mut Vec<Frame>) {
     }
 }
 
-pub fn sleep_and_awake(anim_speed: f64, sleeper: SpinSleeper) {
-    sleeper.sleep_s(anim_speed);
-    app::awake();
+// app::add_timeout3(0.016, move |handle| {
+//     let frame = frame.clone();
+//     move_image(frame, handle);
+// });
+
+pub fn sleep_and_awake(app: app::App, anim_speed: f64, sleeper: SpinSleeper) {
+    app::add_timeout3(0.016, cb)
+    // sleeper.sleep_s(anim_speed);
+    // app::awake();
 }
 
 pub fn insert_new_item_into_window<'a>(

@@ -41,7 +41,7 @@ pub struct CollectCards {
     pub player: Player,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct DistributeCards {
     pub bottom_hand: [Card; 4],
     pub top_hand: [Card; 4],
@@ -319,7 +319,10 @@ pub fn move_card_animation(
             .unwrap()
             .to_owned()
             .set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-        sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
+        sleep_and_awake(
+            f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0,
+            sleeper,
+        );
         cards_on_board
             .last()
             .unwrap()
@@ -371,7 +374,10 @@ pub fn collect_cards_on_ui(
 
         for i in 0..time_len {
             a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-            sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
+            sleep_and_awake(
+                f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0,
+                sleeper,
+            );
             a_card_frame.parent().unwrap().redraw();
         }
     }
@@ -379,13 +385,13 @@ pub fn collect_cards_on_ui(
     *cards_on_board = Vec::new();
 }
 
-pub fn distribute_cards_on_ui(
+pub fn distribute_cards_on_ui_helper(
     dc: DistributeCards,
     p_bottom_cards: &mut Vec<Frame>,
     p_top_cards: &mut Vec<Frame>,
     cards_on_decs: &mut Vec<Frame>,
     win_clone: &mut DoubleWindow,
-    sleeper: SpinSleeper,
+    handle: app::TimeoutHandle,
 ) {
     for (player_cards, player_hand, hidden) in [
         (p_top_cards, dc.top_hand, true),
@@ -413,7 +419,7 @@ pub fn distribute_cards_on_ui(
 
             for i in 0..time_len {
                 a_card_frame.set_pos(*series_x.get(i).unwrap(), *series_y.get(i).unwrap());
-                sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
+                // sleep_and_awake(f64::from(ANIM_SPEED.load(Ordering::Relaxed)) / 10000.0, sleeper);
                 a_card_frame.parent().unwrap().redraw();
             }
             a_card_frame.hide();
@@ -424,5 +430,23 @@ pub fn distribute_cards_on_ui(
         activate_all_bottom_cards(player_cards);
     }
 
-    app::awake();
+    // app::awake();
+}
+
+pub fn distribute_cards_on_ui(
+    dc: DistributeCards,
+    p_bottom_cards: &'static mut Vec<Frame>,
+    p_top_cards: &'static mut Vec<Frame>,
+    cards_on_decs: &'static mut Vec<Frame>,
+    win_clone: &'static mut DoubleWindow,
+    sleeper: SpinSleeper,
+) {
+    app::add_timeout3(0.016, move |handle| {
+        let mut dccc = dc.clone();
+        // let mut xxx = &p_bottom_cards.clone();
+        // let mut yyy = &p_top_cards.clone();
+        // let mut zzz = &cards_on_decs.clone();
+        // let mut www = &win_clone.clone();
+        distribute_cards_on_ui_helper(dccc, p_bottom_cards, p_top_cards, cards_on_decs, win_clone, handle);
+    });
 }
